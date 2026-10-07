@@ -105,6 +105,15 @@ body.drawer-hidden .drawer{transform:translateX(-100%)}
 .psel-t{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .psel-m{font-size:13.5px;color:var(--on2)}
 .psel>.ms{color:var(--on3)}
+.lbl-btn{display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:var(--r);background:var(--surface);cursor:pointer;font-size:14px;color:var(--on2);text-align:left}
+.lbl-btn:hover{background:var(--s1)}
+.lbl-btn.on{border-color:var(--pri);color:var(--on-pri-c);background:var(--pri-c)}
+.lbl-btn .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbl-btn .ms{font-size:19px}
+.exp-note{border:1px solid var(--line2);border-radius:var(--r2);padding:12px 14px;margin-bottom:14px;background:var(--s1)}
+.exp-note .k{font-size:13px;color:var(--on3);margin-bottom:4px;display:flex;gap:6px;align-items:center}
+.exp-note .m{white-space:pre-wrap;font-size:15px;line-height:1.6}
+#verBtn{height:32px;font-size:14px;padding:0 12px}
 .num{width:34px;height:34px;border-radius:var(--r);background:var(--s2);color:var(--on2);display:grid;place-items:center;font-weight:700;flex:none;font-size:15px}
 .num.pri{background:var(--pri);color:var(--on-pri)}
 .newbtn{width:100%;height:42px;justify-content:flex-start;padding:0 14px}
@@ -461,6 +470,7 @@ mark.hl.bad:hover,mark.hl.bad.hl-on{background:color-mix(in srgb,var(--bad) 30%,
   <a class="brand" href="#"><span class="ms f">stethoscope</span><span class="t">CPX 가상 환자</span></a>
   <div class="ctx" id="ctxTitle"></div>
   <div class="spacer"></div>
+  <button class="btn tonal" id="verBtn" title="새 판이 배포됐습니다" hidden><span class="ms">refresh</span>새로고침</button>
   <button class="iconbtn hide-m" id="rulesBtn" title="진료 규칙"><span class="ms">help</span></button>
   <button class="iconbtn" id="acctBtn" title="계정"><span class="ms">account_circle</span></button>
 </header>
@@ -470,6 +480,7 @@ mark.hl.bad:hover,mark.hl.bad.hl-on{background:color-mix(in srgb,var(--bad) 30%,
   <div class="drawer-mhead"><span class="brand"><span class="ms f">stethoscope</span>CPX 가상 환자</span><button class="iconbtn" id="drawerClose" title="닫기"><span class="ms">close</span></button></div>
   <div class="drawer-top">
     <button class="psel" id="pselBtn" title="환자 고르기"></button>
+    <button class="lbl-btn" id="lblBtn" title="실험 라벨로 거르기" hidden></button>
     <button class="btn filled newbtn" id="newBtn"><span class="ms">add</span>새 진료</button>
   </div>
   <div class="drawer-list" id="sideHist"></div>
@@ -666,6 +677,33 @@ function caseLabel(cid){ const c = caseOf(cid); return c ? `환자 ${c.no}` : `�
 const sexW = s => s === "여" ? "여성" : s === "남" ? "남성" : (s || "");
 const scoreCls = t => t >= 70 ? "g" : t >= 40 ? "y" : "r";
 function setPatient(cid){ PSEL = cid; store.set("sp_patient", cid === "all" ? "" : cid); renderSide(); }
+/* 실험 라벨: AI 의사로 가설을 시험할 때 같은 라벨로 묶고, 라벨별 평균 점수로 비교한다 */
+let LSEL = store.get("sp_label");
+function setLabel(l){ LSEL = l; store.set("sp_label", l); renderSide(); }
+function labelStats(rows){
+  const m = new Map();
+  for (const r of rows) if (r.label) {
+    const x = m.get(r.label) || {n: 0, done: 0, sum: 0};
+    x.n++; if (!r.live && r.total != null) { x.done++; x.sum += r.total; }
+    m.set(r.label, x);
+  }
+  return [...m.entries()].map(([label, x]) => ({label, ...x, avg: x.done ? Math.round(x.sum / x.done) : null}));
+}
+const statTxt = x => `${x.n}회${x.avg != null ? ` · 평균 ${x.avg}점` : ""}`;
+function renderLbl(){
+  const rows = HIST.filter(r => PSEL === "all" || r.case === PSEL), st = labelStats(rows), b = $("#lblBtn");
+  if (LSEL && !HIST.some(r => r.label === LSEL)) { LSEL = ""; store.set("sp_label", ""); }
+  b.hidden = !st.length && !LSEL;
+  const cur = st.find(x => x.label === LSEL);
+  b.classList.toggle("on", !!LSEL);
+  b.innerHTML = `${I("science")}<span class="t">${LSEL ? `${esc(LSEL)} · ${cur ? statTxt(cur) : "0회"}` : `실험 라벨 ${st.length}개`}</span>${I("expand_more")}`;
+}
+$("#lblBtn").onclick = e => {
+  const rows = HIST.filter(r => PSEL === "all" || r.case === PSEL), st = labelStats(rows).sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  const m = popup(e.currentTarget, `<button data-l="" class="${LSEL ? "" : "on"}">${I("groups")}<span class="mi-main">모든 진료<small>라벨 없는 진료 포함</small></span></button><hr>` +
+    st.map(x => `<button data-l="${esc(x.label)}" class="${LSEL === x.label ? "on" : ""}">${I("science")}<span class="mi-main">${esc(x.label)}<small>${statTxt(x)}${x.n > x.done ? ` · 진행 중 ${x.n - x.done}` : ""}</small></span></button>`).join(""), true);
+  $$("button[data-l]", m).forEach(b => b.onclick = () => { closeMenu(); setLabel(b.dataset.l); });
+};
 function renderPsel(){
   const c = caseOf(PSEL), n = c ? HIST.filter(r => r.case === c.cid).length : HIST.length;
   $("#pselBtn").innerHTML = c
@@ -694,13 +732,13 @@ $("#newBtn").onclick = e => {
 function navItem(r){
   const href = "#c/" + r.name, one = PSEL !== "all";
   const t = r.title || (one ? `${fmtWhen(r.name)} 진료` : `${caseLabel(r.case)} · ${r.cc || caseOf(r.case)?.cc || ""}`);
-  const m = one ? `${r.mode || ""} · ${r.turns}턴${r.dx ? " · " + r.dx : ""}` : `${fmtWhen(r.name)} · ${r.mode || ""} · ${r.turns}턴`;
+  const m = (r.label && !LSEL ? r.label + " · " : "") + (one ? `${r.mode || ""} · ${r.turns}턴${r.dx ? " · " + r.dx : ""}` : `${fmtWhen(r.name)} · ${r.mode || ""} · ${r.turns}턴`);
   const right = r.live ? `<span class="live-badge"><i></i>진행 중</span>` : `<span class="score-badge ${scoreCls(r.total)}">${r.total}</span>`;
   return `<a class="ni${prevHash && prevHash.startsWith(href) && (prevHash === href || prevHash[href.length] === "/") ? " on" : ""}" href="${esc(href)}"><div class="ni-main"><div class="ni-t">${esc(t)}</div><div class="ni-m">${esc(m)}</div></div>${right}</a>`;
 }
 function renderSide(){
-  renderPsel();
-  const rows = HIST.filter(r => PSEL === "all" || r.case === PSEL);
+  renderPsel(); renderLbl();
+  const rows = HIST.filter(r => (PSEL === "all" || r.case === PSEL) && (!LSEL || r.label === LSEL));
   let out = "", g = null;
   const live = rows.filter(r => r.live);
   if (live.length) out += `<div class="grp">진행 중</div>` + live.map(navItem).join("");
@@ -709,7 +747,7 @@ function renderSide(){
     if (k !== g) { out += `<div class="grp">${k}</div>`; g = k; }
     out += navItem(r);
   }
-  $("#sideHist").innerHTML = out || `<div class="side-empty">아직 이 환자의 진료가 없습니다</div>`;
+  $("#sideHist").innerHTML = out || `<div class="side-empty">${LSEL ? "이 라벨의 진료가 없습니다" : "아직 이 환자의 진료가 없습니다"}</div>`;
   $("#adminLink").classList.toggle("on", /^#(admin|edit\/)/.test(prevHash || ""));
 }
 
@@ -809,6 +847,7 @@ async function openConv(name, tab){
   CONVC.set(name, fresh);
   if (!(cvTab === "soap" && body().contains(document.activeElement))) showConv(fresh, cvTab);  // 쓰는 중이면 건드리지 않음
 }
+const subOf = v => [v.patient?.cc, v.mode, v.meta?.label, v.meta?.title].filter(Boolean).join(" · ");
 function showConvLoading(name, tab){
   const r = HIST.find(x => x.name === name);
   CV = null;
@@ -825,7 +864,7 @@ function showConv(v, tab){
   const p = v.patient || {}, c = caseOf(v.case);
   if (c && PSEL !== "all" && PSEL !== c.cid) setPatient(c.cid);
   $("#cvName").textContent = `${p.name || ""} · ${p.age}세 ${p.sex || ""}`;
-  $("#cvSub").textContent = `${p.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
+  $("#cvSub").textContent = subOf(v);
   setCtx(`${p.name || ""} · ${p.cc || ""}`);
   const tb = $("#act [data-a=TEST]"); tb.disabled = v.mode !== "본선"; tb.title = tb.disabled ? "검사는 본선에서만 할 수 있습니다" : "TEST";
   $("#txt").value = DRAFT[v.name] || "";
@@ -852,12 +891,47 @@ $("#sideHist").addEventListener("touchstart", e => { const a = e.target.closest(
 /* 진료 목록을 서버에 다시 묻지 않고 바로 고친다 */
 function rowOf(v){
   const s = v.submit, p = v.patient || {};
-  return {name: v.name, title: v.meta?.title || "", memo: v.meta?.memo || "", case: v.case, who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "",
+  return {name: v.name, title: v.meta?.title || "", memo: v.meta?.memo || "", label: v.meta?.label || "", case: v.case, who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "",
     mode: v.mode, turns: v.turn, status: v.done ? "제출" : "진행 중", total: s ? s.total : null, dx: s ? s.dx : null, truth: s ? s.truth : null,
     rescored: Math.max(0, (v.submits || []).length - 1), cc: p.cc || "", live: !v.done, accuracy: s ? s.judge?.accuracy ?? null : null, scores: s ? s.scores : null};
 }
 function upsertRow(v){ const r = rowOf(v), i = HIST.findIndex(x => x.name === v.name); if (i >= 0) HIST[i] = r; else HIST.unshift(r); renderSide(); }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && CASES.length) refreshSide(); });  // 다른 기기·팀원 변경 반영
+/* 여러 명이 함께 쓸 때 맞추기: 창·탭으로 돌아오면, 그리고 화면을 보는 동안 1분마다 진료 목록과 지금 연 진료를 다시 받는다 */
+let lastSync = 0, syncing = false;
+async function syncNow(){
+  if (syncing || !TOKEN || !CASES.length || document.visibilityState !== "visible" || Date.now() - lastSync < 10e3) return;
+  syncing = true; lastSync = Date.now();
+  try {
+    await refreshSide();
+    const name = CV?.name;
+    if (name && !PENDING.has(name)) {
+      const fresh = await fetchConv(name).catch(() => null);
+      const busy = body().contains(document.activeElement) || !!MENU || !!$(".scrim-dlg");  // SOAP 쓰는 중·메뉴·대화상자는 건드리지 않음
+      if (fresh && CV?.name === name && sigOf(CV) !== sigOf(fresh)) {
+        CONVC.set(name, fresh);
+        if (!busy) {
+          const y = body().scrollTop, typing = document.activeElement === $("#txt");
+          DRAFT[name] = $("#txt").value; showConv(fresh, cvTab);
+          if (cvTab !== "chat") body().scrollTop = y;
+          if (typing) $("#txt").focus();  // 입력창에 쓰던 말·커서는 그대로
+        }
+      }
+    }
+    checkVersion();
+  } finally { syncing = false; }
+}
+/* 새 판이 배포됐으면 위쪽에 새로고침 단추 (열어 둔 탭은 예전 화면을 계속 쓰기 때문) */
+let verAt = 0;
+async function checkVersion(){
+  const ver = window.SP_CONFIG && SP_CONFIG.ver;
+  if (!ver || Date.now() - verAt < 5 * 60e3) return;
+  verAt = Date.now();
+  try { const m = /ver:\s*'([^']+)'/.exec(await (await fetch("config.js?t=" + Date.now(), {cache: "no-store"})).text()); if (m && m[1] !== ver) $("#verBtn").hidden = false; } catch(e){}
+}
+$("#verBtn").onclick = () => location.reload();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
+window.addEventListener("focus", syncNow);
+setInterval(syncNow, 60e3);
 function setTab(t, fromRoute){
   if (!CV) return;
   cvTab = t;
@@ -870,7 +944,7 @@ function setTab(t, fromRoute){
 $$("#cvTabs .ctab").forEach(b => b.onclick = () => setTab(b.dataset.t));
 $("#cvVit").onclick = e => { if (CV) popup(e.currentTarget, `<div class="pop"><b>활력징후</b>${vitHTML(CV.patient?.vitals)}</div>`); };
 $("#cvMore").onclick = e => { if (CV) menu(e.currentTarget, [
-  {icon:"edit", label:"제목·메모", onClick: () => editMeta(CV)},
+  {icon:"edit", label:"제목·라벨·메모", onClick: () => editMeta(CV)},
   {icon:"help", label:"진료 규칙", onClick: showRules},
   "-",
   {icon:"delete", label:"이 진료 삭제", danger:true, onClick: async () => {
@@ -1085,7 +1159,8 @@ function renderResult(){
   }
   const sub = v.submit, j = sub.judge || {}, pf = sub.patient || {}, sc = sub.scores || {}, u = sub.usage || {};
   const acc = j.accuracy ?? 0, [vc, vi, vt] = acc >= 90 ? ["g","check_circle","주진단 정답"] : acc >= 40 ? ["y","error","주진단 부분 정답"] : ["r","cancel","주진단 오답"];
-  let h = `<div class="pane"><div class="stats">
+  const mt = v.meta || {}, expNote = mt.label || mt.memo ? `<div class="exp-note"><div class="k">${I("science")}${esc([mt.label, mt.title].filter(Boolean).join(" · ") || "메모")}</div>${mt.memo ? `<div class="m">${esc(mt.memo)}</div>` : ""}</div>` : "";
+  let h = `<div class="pane">${expNote}<div class="stats">
       <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${sub.total}<small>/ 100</small></div></div>
       <div class="stat"><div class="k">사용 턴</div><div class="v">${sub.turns}<small>/ ${v.max_turns}</small></div></div>
       <div class="stat"><div class="k">반려</div><div class="v">${sub.rejected}<small>회</small></div></div></div>
@@ -1143,14 +1218,15 @@ function refHTML(r){
   return h + `</div>`;
 }
 function editMeta(v){
-  const meta = v.meta || {};
-  dialog({title:"제목·메모", body:`<div class="fld"><label>제목</label><input class="inp" id="mT" value="${esc(meta.title || "")}" placeholder="${esc(fmtWhen(v.name))} 진료"></div>
-    <div class="fld"><label>메모</label><textarea class="inp" id="mM" rows="4" placeholder="잘한 점, 다음에 고칠 점">${esc(meta.memo || "")}</textarea></div>`,
+  const meta = v.meta || {}, labels = [...new Set(HIST.map(r => r.label).filter(Boolean))];
+  dialog({title:"제목·라벨·메모", body:`<div class="fld"><label>실험 라벨 <small>같은 가설로 돌린 진료를 묶는 이름</small></label><input class="inp" id="mL" list="mLs" value="${esc(meta.label || "")}" placeholder="예: H1 감별 먼저 묻기"><datalist id="mLs">${labels.map(l => `<option value="${esc(l)}">`).join("")}</datalist></div>
+    <div class="fld"><label>제목</label><input class="inp" id="mT" value="${esc(meta.title || "")}" placeholder="${esc(fmtWhen(v.name))} 진료 · 예: haiku-4.5 · 프롬프트 v2 · 1회"></div>
+    <div class="fld"><label>메모</label><textarea class="inp" id="mM" rows="5" placeholder="가설: …&#10;바꾼 것: …&#10;기대: …&#10;결과·관찰: …">${esc(meta.memo || "")}</textarea></div>`,
     actions:[{label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
       try {
-        const r = await api("/api/record/update", {name:v.name, title:$("#mT", el).value, memo:$("#mM", el).value});
+        const r = await api("/api/record/update", {name:v.name, label:$("#mL", el).value, title:$("#mT", el).value, memo:$("#mM", el).value});
         close(null); toast("저장했습니다"); v.meta = r.meta; upsertRow(v);
-        if (CV === v) $("#cvSub").textContent = `${caseOf(v.case) ? `환자 ${caseOf(v.case).no} · ` : ""}${v.patient?.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
+        if (CV === v) { $("#cvSub").textContent = subOf(v); if (cvTab === "result") renderResult(); }
       } catch(e){ fail(e); }
     }}]});
 }

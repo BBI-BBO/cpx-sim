@@ -7,12 +7,28 @@ S·O·A·P 초진 기록을 제출하면 CPX 방식으로 채점하는 연습 �
 - 환자 응답·반려 판정·채점은 서버가 gpt-6-luna 로 합니다 (팀 공용 키).
 - 채점: 정보수집 25 · 진단추론 15 · 검사·추적 10 · 안전 15 · 의사소통 15 · 효율 20, SOAP 문장별·턴별 피드백
 
+| 절 | 누가 |
+|---|---|
+| [1. 웹에서 진료하기](#1-웹에서-진료하기) | 사람 |
+| [2. API: 대화하고 SOAP 제출하기](#2-api-대화하고-soap-제출하기) | AI 의사·직접 만든 코드 |
+| [3. 가설 세우고 시험하기](#3-가설-세우고-시험하기--실험-라벨제목메모) | Claude·GPT 로 실험하는 사람 |
+| [4. 구성·배포](#4-구성배포) | 관리자 |
+
 ## 1. 웹에서 진료하기
 
 1. 왼쪽 위에서 환자를 고르고 **새 진료** → 예선/본선.
 2. **대화** 탭에서 대화·진찰(·검사)을 한 번에 하나씩. 묶은 질문이나 30자 초과는 반려(턴 차감 없음).
 3. **SOAP 기록** 탭에 S·O·A·P와 주진단을 쓰고 제출 (쓰는 대로 자동 저장).
-4. **결과** 탭: 점수·사용 턴, 영역별 점수, 대화와 SOAP 원문에 색 하이라이트 (초록 좋음 · 주황 아쉬움 · 빨강 틀림). 마우스를 올리면 피드백.
+4. **결과** 탭: 점수·사용 턴, 영역별 점수, 대화와 SOAP 원문에 색 하이라이트 (초록 좋음 · 주황 아쉬움 · 빨강 틀림). 마우스를 올리면(휴대폰은 누르면) 피드백.
+
+여럿이 함께 쓸 때
+- 다른 사람이 만든 진료는 창이나 탭으로 돌아올 때, 그리고 화면을 보는 동안 1분마다 사이드바와 지금 연 진료에 저절로 들어옵니다.
+- 새 판이 배포되면 위쪽에 **새로고침** 단추가 뜹니다. 누르면 고친 화면으로 바뀝니다.
+
+환자에 대해 알아 둘 것
+- 환자는 물은 것만 답합니다. 없는 증상은 짧게 부인하고, 묻지 않은 증상은 먼저 말하지 않습니다.
+- 환자는 자기 몸을 다 알지 못합니다. 다른 병원에서 들은 진단이나 "임신은 아닐 거예요" 같은 짐작은 단서일 뿐입니다.
+  그 말만 믿고 위험한 진단을 지우면 감점이고, 가능성이 낮아도 감별에 남겨 검사·기록으로 확인하는 계획을 세우면 가점입니다.
 
 ## 2. API: 대화하고 SOAP 제출하기
 
@@ -40,12 +56,15 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 ```
 
 **③ 진료 시작** `POST /api/start` — 이후 모든 요청은 응답의 `name` 으로 이 진료를 가리킵니다.
+`label`·`title`·`memo` 는 넣지 않아도 됩니다 (실험할 때 쓰는 법은 3절).
 ```json
-요청 {"cid": "A", "mode": "예선"}            // 본선이면 검사(TEST) 가능
+요청 {"cid": "A", "mode": "예선",                       // 본선이면 검사(TEST) 가능
+      "label": "H1 감별 먼저 묻기", "title": "haiku-4.5 · 1회", "memo": "가설: …"}
 응답 {"name": "20261007_152919_A",
       "patient": {"name": "김서연", "age": 20, "sex": "여", "cc": "심한 복통",
                   "opening": "저는 김서연이고 스무 살이에요. 배가 너무 아파서 왔어요.",
                   "vitals": "혈압: 고혈압(수치 미기재); 맥박: 빈맥(수치 미기재); …"},
+      "meta": {"label": "H1 감별 먼저 묻기", "title": "haiku-4.5 · 1회", "memo": "가설: …"},
       "turn": 0, "max_turns": 50, …}
 ```
 
@@ -80,14 +99,17 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
                  "judge": {"accuracy": 100, "soap_sentences": […], "turn_notes": […], "checklist": […], "red_flags": […], "soap_top": […]},
                  "patient": {"good": […], "regret": […], "ppi": {…}}}}
 ```
-SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다. `dx` 는 병명 하나 (코드는 붙이지 않아도 됨). 결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
+SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다.
+환자의 짐작·들은 말은 "환자는 ~라고 함"처럼 환자 말로 적습니다. `dx` 는 병명 하나 (코드는 붙이지 않아도 됨).
+결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
 
 **그 밖**
 | 요청 | 쓰임 |
 |---|---|
-| `GET /api/conv?name=` | 진료 전체 (대화, 쓰다 만 SOAP, 제출 결과) |
+| `GET /api/conv?name=` | 진료 전체 (대화, 쓰다 만 SOAP, 제출 결과, `meta`) |
+| `GET /api/history` | 진료 목록 (`label`·`title`·점수 포함) |
 | `POST /api/draft` `{"name", "soap", "dx"}` | 제출 전 SOAP 저장 |
-| `POST /api/record/update` `{"name", "title", "memo"}` | 제목·메모 (예: `"AI · claude-haiku-4-5"` 처럼 사람 기록과 구분) |
+| `POST /api/record/update` `{"name", "label", "title", "memo"}` | 실험 라벨·제목·메모. 보낸 칸만 고침 |
 | `POST /api/record/rescore` `{"name", "soap", "dx"}` | 대화는 그대로 두고 SOAP 만 고쳐 다시 채점 |
 
 curl 로 해 보기
@@ -95,7 +117,7 @@ curl 로 해 보기
 API=https://yobrfksujprspfziukoa.supabase.co/functions/v1
 TOK=$(curl -s -X POST $API/api/login -H 'Content-Type: application/json' -d "{\"password\":\"$CPX_PASSWORD\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 H=(-H "Authorization: Bearer $TOK" -H 'Content-Type: application/json')
-curl -s -X POST $API/api/start "${H[@]}" -d '{"cid":"A","mode":"예선"}'
+curl -s -X POST $API/api/start "${H[@]}" -d '{"cid":"A","mode":"예선","label":"H0 기본","title":"curl 시험"}'
 curl -s -X POST $API/api/act "${H[@]}" -d '{"name":"<start 가 준 name>","act":"SAY","text":"어디가 불편하세요?"}'
 curl -s --max-time 180 -X POST $API/api/submit "${H[@]}" -d '{"name":"<name>","soap":{"S":"…","O":"…","A":"…","P":"…"},"dx":"주진단"}'
 ```
@@ -108,9 +130,51 @@ curl -s --max-time 180 -X POST $API/api/submit "${H[@]}" -d '{"name":"<name>","s
 CPX_PASSWORD='팀 비밀번호' ANTHROPIC_API_KEY=sk-ant-... python3 scripts/agent_doctor.py --patient 1
 CPX_PASSWORD='팀 비밀번호' OPENAI_API_KEY=sk-... python3 scripts/agent_doctor.py --patient all --model gpt-6-luna --quiet
 ```
-`--patient 1`·`1,3`·`all`, `--mode 본선`, `--repeat N`, `--model` (기본 `claude-haiku-4-5-20251001`, `claude…` 면 Anthropic, 그 밖은 OpenAI 호환), `--quiet` (점수표만).
+| 옵션 | 뜻 |
+|---|---|
+| `--patient 1` · `1,3` · `all` | 환자 번호 |
+| `--mode 본선` | 검사(TEST)까지 허용 |
+| `--repeat N` | 같은 환자를 N번 (제목에 회차가 붙음) |
+| `--model` | 기본 `claude-haiku-4-5-20251001`. `claude…` 면 Anthropic, 그 밖은 OpenAI 호환 (`--base-url`·`--key-env`) |
+| `--label` `--title` `--memo` | 실험 표시 (3절) |
+| `--hint "지시"` | 가설로 바꿔 보는 지시를 의사 지시문 끝에 덧붙임. 메모에 자동으로 남음 |
+| `--quiet` | 대화는 찍지 않고 점수표만 |
 
-## 3. 구성·배포
+## 3. 가설 세우고 시험하기 — 실험 라벨·제목·메모
+
+Claude·GPT 의사로 "이렇게 바꾸면 점수가 오를까?"를 시험할 때, 진료마다 세 가지를 붙여 두면 웹에서 모아 보고 비교할 수 있습니다.
+실험 관리 도구(MLflow·W&B)의 group·run name·notes 와 같은 짜임입니다.
+
+| 칸 | 뜻 | 정하는 법 | 예 |
+|---|---|---|---|
+| 라벨 `label` | 실험 묶음. 같은 가설·같은 조건으로 돌린 진료는 같은 라벨 | `H번호 + 가설 요약`, 대조군은 `H0 기본` | `H0 기본`, `H1 감별 먼저 묻기` |
+| 제목 `title` | 이 진료 한 줄 | 모델 · 조건 · 회차 | `haiku-4.5 · 예선 · 2회` |
+| 메모 `memo` | 가설과 결과 | 아래 틀 | |
+
+메모 틀
+```
+가설: 주호소를 들은 뒤 감별 세 가지를 가르는 질문부터 하면 정보수집·진단추론 점수가 오른다
+바꾼 것: 의사 지시문에 "주호소를 들은 뒤 감별 3개를 정하고 그걸 가르는 질문부터" 추가 (--hint)
+기대: H0 대비 정보수집 +3, 진단추론 +2
+결과·관찰: (돌린 뒤 웹에서 적기)
+```
+
+순서
+1. **대조군** — 아무것도 바꾸지 않고 `H0 기본` 라벨로 돌립니다. 환자 응답과 채점에 무작위성이 있어 한 번으로는 차이를 말하기 어려우니 같은 환자를 `--repeat 3` 이상.
+2. **가설 하나만 바꾸기** — `H1 …` 라벨로 같은 환자·같은 모델·같은 횟수. 한 번에 한 가지만 바꿔야 무엇이 효과인지 압니다.
+3. **비교** — 웹 사이드바의 **실험 라벨** 단추를 누르면 라벨별 횟수·평균 점수가 나옵니다. 라벨을 고르면 그 진료만 보이고, 결과 탭 맨 위에 라벨·메모가 나옵니다.
+4. **기록** — 진료 화면 오른쪽 위 ⋮ 메뉴 → **제목·라벨·메모**에서 결과·관찰을 적습니다. 이미 쓴 라벨은 목록에서 고를 수 있습니다.
+
+```bash
+# 대조군과 가설 하나 (환자 1, 각 3회)
+python3 scripts/agent_doctor.py --patient 1 --repeat 3 --quiet --label "H0 기본" --memo "가설 없음 (대조군)"
+python3 scripts/agent_doctor.py --patient 1 --repeat 3 --quiet --label "H1 감별 먼저 묻기" \
+  --memo $'가설: 감별을 가르는 질문부터 하면 정보수집·진단추론이 오른다\n기대: H0 대비 +5' \
+  --hint "주호소를 들은 뒤 감별진단 3개를 정하고, 그것들을 가르는 질문부터 하세요."
+```
+API로 직접 붙일 때는 `/api/start` 에 `label`·`title`·`memo` 를 같이 보내거나, 진료 뒤 `/api/record/update` 로 붙입니다 (2절).
+
+## 4. 구성·배포
 
 - 화면: `web/index.html` → GitHub Pages
 - 엔진·API: `supabase/functions/api` (Deno) → Supabase Edge Function

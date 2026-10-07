@@ -70,11 +70,12 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: 함수 주소 넣기
+      - name: 함수 주소·판 번호 넣기
         env:
           REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          echo "window.SP_CONFIG = {api: 'https://${REF}.supabase.co/functions/v1'};" > web/config.js
+          # ver: 열어 둔 화면이 새 판 배포를 알아채 '새로고침' 단추를 띄우는 데 쓴다
+          echo "window.SP_CONFIG = {api: 'https://${REF}.supabase.co/functions/v1', ver: '${GITHUB_SHA::7}'};" > web/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

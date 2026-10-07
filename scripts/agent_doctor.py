@@ -7,9 +7,11 @@
   --mode 본선           검사(TEST)까지 허용
   --model              claude… 로 시작하면 Anthropic, 그 밖은 OpenAI 호환 (--base-url·--key-env 로 다른 서버도)
   --api URL            진료 서버 (기본: 팀 배포판. 로컬 판은 http://127.0.0.1:8765)
+  --label --title --memo  실험 표시 (README 3절). 같은 가설로 돌린 진료는 같은 --label 로 묶어 웹에서 평균을 비교한다
+  --hint "지시"         가설로 바꿔 보는 지시를 의사 지시문 끝에 덧붙인다 (메모에 자동으로 남음)
 
 파이썬 표준 라이브러리만 쓴다. 키는 환경변수나 현재 폴더의 .env 에서 읽는다.
-진료 기록은 웹 사이드바에 'AI · 모델 이름' 제목으로 남고, 결과 화면 주소를 마지막에 출력한다.
+진료 기록은 웹 사이드바에 라벨·'AI · 모델 이름' 제목으로 남고, 결과 화면 주소를 마지막에 출력한다.
 """
 import argparse, getpass, json, os, re, sys, time, urllib.error, urllib.request
 
@@ -126,14 +128,19 @@ def parse_action(text):
 
 
 # ───────────── 진료 한 번 ─────────────
-def encounter(clinic, doctor, cfg, case, mode, quiet=False):
+def encounter(clinic, doctor, cfg, case, mode, quiet=False, meta=None, hint=""):
     say = (lambda *a: None) if quiet else print
-    v = clinic.post("/api/start", {"cid": case["cid"], "mode": mode})
+    meta = meta or {"title": f"AI · {doctor.model}", "memo": f"scripts/agent_doctor.py · {mode}"}
+    v = clinic.post("/api/start", {"cid": case["cid"], "mode": mode, **meta})  # 실험 라벨·제목·메모를 시작할 때 붙인다
     name, p, max_turns = v["name"], v["patient"], v["max_turns"]
-    clinic.post("/api/record/update", {"name": name, "title": f"AI · {doctor.model}", "memo": f"scripts/agent_doctor.py · {mode}"})
+    if (v.get("meta") or {}).get("title") != meta.get("title"):  # 예전 서버는 시작 때 받지 않으므로 따로 붙인다
+        clinic.post("/api/record/update", {"name": name, **meta})
     system = DOCTOR_SYS.format(maxlen=cfg["maxlen"], max_turns=max_turns,
                                test_rule="본선이므로 쓸 수 있습니다" if mode == "본선" else "예선이라 쓸 수 없습니다. 필요한 검사는 P에 계획으로")
-    say(f"\n━━ 환자 {case['no']} · {p.get('name')} ({p.get('age')}세 {p.get('sex')}) · {mode} · {doctor.model}")
+    if hint:
+        system += "\n\n[추가 지시]\n" + hint
+    say(f"\n━━ 환자 {case['no']} · {p.get('name')} ({p.get('age')}세 {p.get('sex')}) · {mode} · {doctor.model}"
+        + (f" · 라벨 {meta['label']}" if meta.get("label") else ""))
     say(f"환자: {p.get('opening')}\n활력징후: {p.get('vitals')}")
     log = [f"[시작] 환자 첫마디: \"{p.get('opening')}\" / 활력징후: {p.get('vitals')}"]
     turn, bad_streak, action, note = 0, 0, None, ""
@@ -194,6 +201,10 @@ def main():
     ap.add_argument("--effort", help="추론 모델의 reasoning_effort (none·low·medium·high)")
     ap.add_argument("--api", default=os.environ.get("CPX_API") or DEFAULT_API, help="진료 서버 주소")
     ap.add_argument("--quiet", action="store_true", help="대화를 찍지 않고 점수만")
+    ap.add_argument("--label", default="", help="실험 라벨: 같은 가설로 돌린 진료를 묶는 이름 (예: 'H1 감별 먼저 묻기')")
+    ap.add_argument("--title", default="", help="진료 제목 (기본: 'AI · 모델 이름', --repeat 면 회차를 붙임)")
+    ap.add_argument("--memo", default="", help="메모: 가설·바꾼 것·기대 (실행 정보는 자동으로 덧붙임)")
+    ap.add_argument("--hint", default="", help="가설로 바꿔 보는 지시를 의사 지시문 끝에 덧붙임")
     a = ap.parse_args()
     pw = dotenv("CPX_PASSWORD") or dotenv("SP_WEB_PASSWORD") or getpass.getpass("진료 서버 비밀번호: ")
     clinic, doctor = Clinic(a.api, pw), Doctor(a.model, a.base_url, a.key_env, a.effort)
@@ -201,9 +212,13 @@ def main():
     cases = cfg["cases"] if a.patient == "all" else [c for c in cfg["cases"] if str(c["no"]) in a.patient.split(",")]
     if not cases:
         sys.exit("그런 환자가 없습니다. 있는 환자: " + ", ".join(f"{c['no']} {c['cc']}" for c in cfg["cases"]))
-    rows = [encounter(clinic, doctor, cfg, c, a.mode, a.quiet) for c in cases for _ in range(a.repeat)]
+    def meta(i):
+        title = a.title or f"AI · {doctor.model}"
+        memo = [a.memo, f"추가 지시: {a.hint}" if a.hint else "", f"scripts/agent_doctor.py · {a.mode} · {doctor.model}"]
+        return {"label": a.label, "title": title + (f" · {i + 1}회" if a.repeat > 1 else ""), "memo": "\n".join(x for x in memo if x)}
+    rows = [encounter(clinic, doctor, cfg, c, a.mode, a.quiet, meta(i), a.hint) for c in cases for i in range(a.repeat)]
     if len(rows) > 1 or a.quiet:
-        print(f"\n━━ {doctor.model} · {a.mode} · {len(rows)}회")
+        print(f"\n━━ {doctor.model} · {a.mode} · {len(rows)}회" + (f" · 라벨 {a.label} (웹 사이드바 '실험 라벨'에서 모아 보기)" if a.label else ""))
         print(f"{'환자':<14}{'점수':>5}  {'정보':>4}{'추론':>4}{'검사':>4}{'안전':>4}{'소통':>4}{'효율':>4}  {'턴':>3}  주진단 → 정답")
         for r in rows:
             s = r["scores"]

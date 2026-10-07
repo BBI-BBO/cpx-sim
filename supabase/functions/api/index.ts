@@ -402,12 +402,19 @@ async function convView(R: any, withRef = true) {
   if (subs.length && withRef) { try { v.reference = (await getCase(R.cid, true)).reference ?? null; } catch { v.reference = null; } }
   return v;
 }
+// 실험 라벨(가설 묶음) · 제목 · 메모(가설·바꾼 것·결과). 요청에 들어 있는 칸만 고친다 (title·memo 만 보내도 라벨은 그대로)
+const META_MAX: Record<string, number> = { label: 60, title: 100, memo: 2000 };
+function cleanMeta(b: any) {
+  const out: Record<string, string> = {};
+  for (const [k, n] of Object.entries(META_MAX)) if (b && k in b) out[k] = String(b[k] ?? "").trim().slice(0, n);
+  return out;
+}
 async function history() {
   const rows = await db.encList();
   return rows.map((r: any) => {
     const m = /^(\d{8})_(\d{6})_/.exec(r.name), meta = r.meta || {}, n = r.n_submits || 0;
     return {
-      name: r.name, title: meta.title || "", memo: meta.memo || "",
+      name: r.name, title: meta.title || "", memo: meta.memo || "", label: meta.label || "",
       when: m ? `${m[1].slice(4, 6)}/${m[1].slice(6)} ${m[2].slice(0, 2)}:${m[2].slice(2, 4)}` : r.name,
       case: r.cid, who: r.who || "", mode: r.mode, turns: r.turns || 0, status: n ? "제출" : "진행 중",
       total: n ? r.total : null, dx: n ? r.dx : null, truth: n ? r.truth : null, rescored: Math.max(0, n - 1),
@@ -564,7 +571,7 @@ async function handle(req: Request): Promise<Response> {
     let name = `${stamp()}_${cid}`;
     for (let i = 2; ; i++) {
       try {
-        await db.encInsert({ name, cid, mode, start, events: [], submits: [], meta: {}, usage: { calls: 0, in: 0, out: 0 },
+        await db.encInsert({ name, cid, mode, start, events: [], submits: [], meta: cleanMeta(b), usage: { calls: 0, in: 0, out: 0 },
           turns: 0, n_submits: 0, cc: p.chief_complaint || "", who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "" });
         break;
       } catch (e) {
@@ -606,7 +613,7 @@ async function handle(req: Request): Promise<Response> {
   // 진료 기록 고치기·지우기
   if (path === "/api/record/update") {
     const R = await getEnc(safe(b.name));
-    R.meta = { ...(R.meta || {}), title: String(b.title || "").trim().slice(0, 100), memo: String(b.memo || "").trim().slice(0, 2000), updated: stamp() };
+    R.meta = { ...(R.meta || {}), ...cleanMeta(b), updated: stamp() };
     await db.encPatch(R.name, { meta: R.meta });
     return reply({ ok: true, meta: R.meta });
   }
