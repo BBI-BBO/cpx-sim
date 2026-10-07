@@ -793,10 +793,11 @@ function leaveConv(){
 const CONVC = new Map(), PREF = new Set();  // 연 진료를 기억 (다시 열 때 바로 보여 주고 뒤에서 새로 받아 맞춘다)
 let navSeq = 0;
 const sigOf = v => JSON.stringify([(v.events || []).length, (v.submits || []).length, v.meta || {}, v.done]);
-const fetchConv = name => api("/api/conv?name=" + encodeURIComponent(name));
+const fetchConv = name => api("/api/conv?name=" + encodeURIComponent(name)).then(v => { v._t = Date.now(); return v; });
 async function openConv(name, tab){
   const my = ++navSeq, cached = CONVC.get(name);
   if (cached) showConv(cached, tab); else showConvLoading(name, tab);
+  if (cached && Date.now() - (cached._t || 0) < 15e3) return;  // 방금 받은 것이면 다시 묻지 않음
   let fresh;
   try { fresh = await fetchConv(name); } catch(e){ if (cached && !e.auth) return; throw e; }
   if (my !== navSeq) return;  // 그사이 다른 화면으로 갔음
