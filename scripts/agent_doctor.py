@@ -14,7 +14,7 @@
 import argparse, getpass, json, os, re, sys, time, urllib.error, urllib.request
 
 DEFAULT_API = "https://yobrfksujprspfziukoa.supabase.co/functions/v1"
-WEB = "https://lhc0312.github.io/cpx-sim/"
+WEB = "https://bbi-bbo.github.io/cpx-sim/"
 
 DOCTOR_SYS = """당신은 의사국가시험 CPX 응시자(의사)입니다. 가상 표준화 환자를 진료하고 초진 기록(SOAP)과 주진단을 제출합니다.
 

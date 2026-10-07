@@ -3,7 +3,7 @@
 N.O.V.A. 2026 진단 에이전트 대회 예선 규정(SAY·EXAM·TEST, 30자·한 번에 하나, 50턴)으로 표준화 환자를 진료하고,
 S·O·A·P 초진 기록을 제출하면 CPX 방식으로 채점하는 연습 도구입니다. 사람은 웹에서, AI 의사(Claude·GPT 등)는 아래 API로 진료합니다.
 
-- 웹: **https://lhc0312.github.io/cpx-sim/** (비밀번호는 팀 채널에서. 한 번 들어오면 1일 유지)
+- 웹: **https://bbi-bbo.github.io/cpx-sim/** (비밀번호는 팀 채널에서. 한 번 들어오면 1일 유지)
 - 환자 응답·반려 판정·채점은 서버가 gpt-6-luna 로 합니다 (팀 공용 키).
 - 채점: 정보수집 25 · 진단추론 15 · 검사·추적 10 · 안전 15 · 의사소통 15 · 효율 20, SOAP 문장별·턴별 피드백
 
@@ -80,7 +80,7 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
                  "judge": {"accuracy": 100, "soap_sentences": […], "turn_notes": […], "checklist": […], "red_flags": […], "soap_top": […]},
                  "patient": {"good": […], "regret": […], "ppi": {…}}}}
 ```
-SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다. 결과 화면은 `https://lhc0312.github.io/cpx-sim/#c/<name>/result`.
+SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다. 결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
 
 **그 밖**
 | 요청 | 쓰임 |
