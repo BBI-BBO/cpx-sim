@@ -1,18 +1,14 @@
-"""AI 의사(GPT·Claude·gpt-oss 등)가 CPX 가상 환자와 진료하고 SOAP 를 제출한다. 사람이 웹에서 하는 것과 같은 API·규칙·채점.
+"""AI 의사(Claude·GPT 등)가 CPX 가상 환자와 진료하고 SOAP 를 제출하는 예제. 사람이 웹에서 하는 것과 같은 API·규칙·채점 (README 2절).
 
-  # GPT (OpenAI)
-  OPENAI_API_KEY=... CPX_PASSWORD=... python3 scripts/agent_doctor.py --patient 1 --model gpt-6-luna
-  # Claude (Anthropic)
-  ANTHROPIC_API_KEY=... CPX_PASSWORD=... python3 scripts/agent_doctor.py --patient 2 --model claude-opus-5-5
-  # 대회 의사 모델 gpt-oss-20b (Groq 같은 OpenAI 호환 서버)
-  GROQ_API_KEY=... CPX_PASSWORD=... python3 scripts/agent_doctor.py --patient all --model openai/gpt-oss-20b \\
-      --base-url https://api.groq.com/openai/v1 --key-env GROQ_API_KEY
+  CPX_PASSWORD=... ANTHROPIC_API_KEY=... python3 scripts/agent_doctor.py --patient 1                 # Claude Haiku (기본)
+  CPX_PASSWORD=... OPENAI_API_KEY=... python3 scripts/agent_doctor.py --patient all --model gpt-6-luna --quiet
 
   --patient 1,3 | all   여러 환자를 차례로, --repeat N 번씩. 끝나면 점수표를 보여 준다.
   --mode 본선           검사(TEST)까지 허용
+  --model              claude… 로 시작하면 Anthropic, 그 밖은 OpenAI 호환 (--base-url·--key-env 로 다른 서버도)
   --api URL            진료 서버 (기본: 팀 배포판. 로컬 판은 http://127.0.0.1:8765)
 
-파이썬 표준 라이브러리만 쓴다 (pip 설치 필요 없음). 키는 환경변수나 현재 폴더의 .env 에서 읽는다.
+파이썬 표준 라이브러리만 쓴다. 키는 환경변수나 현재 폴더의 .env 에서 읽는다.
 진료 기록은 웹 사이드바에 'AI · 모델 이름' 제목으로 남고, 결과 화면 주소를 마지막에 출력한다.
 """
 import argparse, getpass, json, os, re, sys, time, urllib.error, urllib.request
@@ -190,7 +186,7 @@ def encounter(clinic, doctor, cfg, case, mode, quiet=False):
 def main():
     ap = argparse.ArgumentParser(description="AI 의사가 CPX 가상 환자를 진료하고 SOAP 를 제출한다")
     ap.add_argument("--patient", default="1", help="환자 번호 (1, 1,3, all)")
-    ap.add_argument("--model", default="gpt-6-luna", help="gpt-6-luna, claude-opus-5-5, openai/gpt-oss-20b …")
+    ap.add_argument("--model", default="claude-haiku-4-5-20251001", help="claude-haiku-4-5-20251001, gpt-6-luna …")
     ap.add_argument("--mode", default="예선", choices=["예선", "본선"])
     ap.add_argument("--repeat", type=int, default=1)
     ap.add_argument("--base-url", help="OpenAI 호환 서버 주소 (예: https://api.groq.com/openai/v1)")
