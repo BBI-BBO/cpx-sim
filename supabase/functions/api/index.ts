@@ -1,8 +1,9 @@
 // CPX 가상 환자 API — Supabase Edge Function (Deno). 로컬 판 tools/sp_web.py · tools/sp_sim.py 를 옮긴 것.
 // 경로·응답 모양은 로컬 판과 같아서 화면(web/index.html)은 두 판에서 그대로 쓴다.
 // 함수 비밀값: SP_OPENAI_API_KEY, SP_WEB_PASSWORD (GitHub Secrets → 배포 워크플로가 넣음)
-// 자동으로 주어지는 값: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (DB 는 이 키로만 읽고 씀. 표마다 RLS 를 켜 두어 공개 키로는 못 읽음)
+// 자동으로 주어지는 값: SUPABASE_DB_URL (DB 직접 연결, 빠름), SUPABASE_URL·서비스 키 (연결이 안 되면 REST 로). 표마다 RLS 를 켜 두어 공개 키로는 못 읽음
 import * as P from "./prompts.ts";
+import postgres from "npm:postgres@3.4.5";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const OPENAI_KEY = env("SP_OPENAI_API_KEY"), PASSWORD = env("SP_WEB_PASSWORD");
@@ -49,7 +50,24 @@ const fmt = (t: string, v: Record<string, unknown>) =>
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const GREET = new RegExp(P.GREET);
 
-// ───────────── DB (PostgREST, 서비스 키) ─────────────
+// ───────────── DB: 직접 연결(postgres.js) 이 기본, 연결이 안 되면 REST(PostgREST) ─────────────
+const DB_URL = env("SUPABASE_DB_URL");
+const sql: any = DB_URL ? postgres(DB_URL, { max: 4, prepare: false, idle_timeout: 30, connect_timeout: 8, onnotice: () => {} }) : null;
+let useSql = !!sql;
+const JSONB = new Set(["start", "events", "draft", "submits", "meta", "usage", "scores", "data"]);
+const wrap = (o: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(o).map(([k, v]) => [k, JSONB.has(k) && v !== null && v !== undefined ? sql.json(v) : v]));
+const connErr = (e: any) => /connect|ECONN|ETIMEDOUT|getaddrinfo|network|CONNECTION|socket|TLS/i.test(`${e?.code ?? ""} ${e?.message ?? e}`);
+async function both<T>(viaSql: () => Promise<T>, viaRest: () => Promise<T>): Promise<T> {
+  if (useSql) {
+    try { return await viaSql(); } catch (e) {
+      if (!connErr(e)) throw e;
+      console.error("DB 직접 연결 실패, REST 로 전환:", e);
+      useSql = false;
+    }
+  }
+  return await viaRest();
+}
 async function rest(method: string, path: string, body?: unknown, prefer = "return=representation"): Promise<any> {
   if (!SB_KEY) throw new Error("함수 환경에 Supabase 서비스 키가 없습니다");
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -61,26 +79,85 @@ async function rest(method: string, path: string, body?: unknown, prefer = "retu
   if (!r.ok) throw new Error(`DB 오류 ${r.status}: ${t.slice(0, 300)}`);
   return t ? JSON.parse(t) : null;
 }
+const ENC_LIST = "name,cid,mode,meta,turns,cc,who,total,dx,truth,accuracy,scores,n_submits";
+const ENC_UPSERT_COLS = ["cid", "mode", "start", "events", "draft", "submits", "meta", "usage", "turns", "n_submits", "cc", "who", "total", "dx", "truth", "accuracy", "scores"];
+const db = {
+  encGet: (name: string) => both(
+    async () => (await sql`select * from encounters where name = ${name} and deleted_at is null`)[0] ?? null,
+    async () => (await rest("GET", `encounters?name=eq.${q(name)}&deleted_at=is.null&select=*`))[0] ?? null),
+  encPatch: (name: string, patch: Record<string, unknown>) => both(
+    async () => { await sql`update encounters set ${sql(wrap({ ...patch, updated_at: new Date() }))} where name = ${name}`; },
+    async () => { await rest("PATCH", `encounters?name=eq.${q(name)}`, { ...patch, updated_at: new Date().toISOString() }, "return=minimal"); }),
+  encInsert: (row: Record<string, unknown>) => both(
+    async () => { await sql`insert into encounters ${sql(wrap(row))}`; },
+    async () => { await rest("POST", "encounters", row, "return=minimal"); }),
+  encList: () => both(
+    async () => await sql`select ${sql(ENC_LIST.split(","))} from encounters where deleted_at is null order by name desc`,
+    async () => await rest("GET", `encounters?deleted_at=is.null&select=${ENC_LIST}&order=name.desc`)),
+  encUpsert: (rows: any[]) => both(
+    async () => {
+      for (const r of rows) {
+        await sql`insert into encounters ${sql(wrap(r))} on conflict (name) do update set
+          ${sql(Object.fromEntries(ENC_UPSERT_COLS.filter((c) => c in r).map((c) => [c, wrap({ [c]: r[c] })[c]])))}, updated_at = now()`;
+      }
+    },
+    async () => { await rest("POST", "encounters", rows, "resolution=merge-duplicates,return=minimal"); }),
+  caseRow: (cid: string) => both(
+    async () => (await sql`select data, updated_at, deleted_at from cases where cid = ${cid}`)[0] ?? null,
+    async () => (await rest("GET", `cases?cid=eq.${q(cid)}&select=data,updated_at,deleted_at`))[0] ?? null),
+  caseList: () => both(
+    async () => await sql`select cid, data, updated_at from cases where deleted_at is null`,
+    async () => await rest("GET", "cases?deleted_at=is.null&select=cid,data,updated_at")),
+  caseCids: () => both(
+    async () => (await sql`select cid from cases`).map((r: any) => r.cid),
+    async () => (await rest("GET", "cases?select=cid")).map((r: any) => r.cid)),
+  caseUpsert: (cid: string, data: unknown) => both(
+    async () => { await sql`insert into cases (cid, data, updated_at) values (${cid}, ${sql.json(data)}, now())
+                            on conflict (cid) do update set data = excluded.data, updated_at = now()`; },
+    async () => { await rest("POST", "cases", { cid, data, updated_at: new Date().toISOString() }, "resolution=merge-duplicates,return=minimal"); }),
+  caseDelete: (cid: string) => both(
+    async () => { await sql`update cases set deleted_at = now() where cid = ${cid}`; },
+    async () => { await rest("PATCH", `cases?cid=eq.${q(cid)}`, { deleted_at: new Date().toISOString() }, "return=minimal"); }),
+  caseHistory: (cid: string, data: unknown) => both(
+    async () => { await sql`insert into case_history (cid, data) values (${cid}, ${sql.json(data)})`; },
+    async () => { await rest("POST", "case_history", { cid, data }, "return=minimal"); }),
+  failGet: (ip: string) => both(
+    async () => (await sql`select n, until_ts from login_fails where ip = ${ip}`)[0] ?? null,
+    async () => (await rest("GET", `login_fails?ip=eq.${q(ip)}&select=n,until_ts`))[0] ?? null),
+  failDel: (ip: string) => both(
+    async () => { await sql`delete from login_fails where ip = ${ip}`; },
+    async () => { await rest("DELETE", `login_fails?ip=eq.${q(ip)}`, undefined, "return=minimal"); }),
+  failSet: (ip: string, n: number, until: string | null) => both(
+    async () => { await sql`insert into login_fails (ip, n, until_ts) values (${ip}, ${n}, ${until})
+                            on conflict (ip) do update set n = excluded.n, until_ts = excluded.until_ts`; },
+    async () => { await rest("POST", "login_fails", { ip, n, until_ts: until }, "resolution=merge-duplicates,return=minimal"); }),
+};
+
+// 증례는 자주 안 바뀌므로 함수 메모리에 1분 기억 (고치면 바로 지움)
+const CASE_TTL = 60e3;
+const caseMemo = new Map<string, { t: number; row: any }>();
+let listMemo: { t: number; rows: any[] } | null = null;
+function forgetCases(cid?: string) { if (cid) caseMemo.delete(cid); else caseMemo.clear(); listMemo = null; }
+
 async function getEnc(name: string): Promise<any> {
-  const rows = await rest("GET", `encounters?name=eq.${q(name)}&deleted_at=is.null&select=*`);
-  if (!rows.length) throw bad("기록이 없습니다", 404);
-  return rows[0];
+  const R = await db.encGet(name);
+  if (!R) throw bad("기록이 없습니다", 404);
+  return R;
 }
 async function saveEnc(R: any, extra: Record<string, unknown> = {}) {
   const subs = R.submits || [], last = subs.at(-1);
-  const patch: any = {
+  await db.encPatch(R.name, {
     events: R.events, draft: R.draft ?? null, submits: subs, meta: R.meta || {}, usage: R.usage,
     turns: R.events.filter((e: any) => e.type === "turn").length, n_submits: subs.length,
     total: last ? last.total : null, dx: last ? last.dx : null, truth: last ? last.truth : null,
-    accuracy: last ? (last.judge || {}).accuracy ?? null : null, scores: last ? last.scores : null,
-    updated_at: new Date().toISOString(), ...extra,
-  };
-  await rest("PATCH", `encounters?name=eq.${q(R.name)}`, patch, "return=minimal");
+    accuracy: last ? (last.judge || {}).accuracy ?? null : null, scores: last ? last.scores : null, ...extra,
+  });
 }
 async function getCase(cid: string, includeDeleted = false): Promise<any> {
-  const rows = await rest("GET", `cases?cid=eq.${q(cid)}${includeDeleted ? "" : "&deleted_at=is.null"}&select=data`);
-  if (!rows.length) throw bad("증례가 없습니다", 404);
-  return rows[0].data;
+  let m = caseMemo.get(cid);
+  if (!m || Date.now() - m.t > CASE_TTL) { m = { t: Date.now(), row: await db.caseRow(cid) }; caseMemo.set(cid, m); }
+  if (!m.row || (!includeDeleted && m.row.deleted_at)) throw bad("증례가 없습니다", 404);
+  return m.row.data;
 }
 function cidKey(c: string): [number, number, number, string] {
   const i = P.ORDER.indexOf(c);
@@ -94,10 +171,16 @@ function sortCids(ids: string[]) {
   });
 }
 async function liveCases(): Promise<any[]> {
-  const rows = await rest("GET", "cases?deleted_at=is.null&select=cid,data,updated_at");
+  if (listMemo && Date.now() - listMemo.t < CASE_TTL) return listMemo.rows;
+  const rows = await db.caseList();
   const order = sortCids(rows.map((r: any) => r.cid));
-  return order.map((cid) => rows.find((r: any) => r.cid === cid));
+  listMemo = { t: Date.now(), rows: order.map((cid) => rows.find((r: any) => r.cid === cid)) };
+  return listMemo.rows;
 }
+const casesPayload = (rows: any[]) => ({
+  cases: rows.map((r: any, i: number) => ({ no: i + 1, cid: r.cid, age: r.data.patient?.age, sex: r.data.patient?.sex, cc: r.data.patient?.chief_complaint })),
+  max_turns: P.MAX_TURNS, max_min: MAX_MIN, maxlen: P.MAXLEN,
+});
 
 // ───────────── OpenAI ─────────────
 type Usage = { calls: number; in: number; out: number };
@@ -266,7 +349,7 @@ async function submit(R: any, C: any, soap: Record<string, string>, dx: string, 
   const numbered = [..."SOAP"].flatMap((k) => split[k].map((x, i) => `[${k}${i + 1}] ${x}`)).join("\n") || "(비어 있음)";
   const user = `[정답(최종 확진)] ${C.truth}\n[모범 답안: 검사 전(SAY+EXAM) 기준 초진 기록]\n${JSON.stringify(C.reference || {}, null, 1)}\n` +
     `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(C.exam || [])}\n` +
-    `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회 · ${mins.toFixed(1)}분\n` +
+    `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n` +
     `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
   const p = C.patient || {}, acting = C.acting || {};
   const prevPatient = rescore && subs.length ? subs.at(-1).patient : null;  // 대화는 그대로이므로 환자 설문은 처음 것을 쓴다
@@ -302,7 +385,7 @@ async function convView(R: any, withRef = true) {
   return v;
 }
 async function history() {
-  const rows = await rest("GET", "encounters?deleted_at=is.null&select=name,cid,mode,meta,turns,cc,who,total,dx,truth,accuracy,scores,n_submits&order=name.desc");
+  const rows = await db.encList();
   return rows.map((r: any) => {
     const m = /^(\d{8})_(\d{6})_/.exec(r.name), meta = r.meta || {}, n = r.n_submits || 0;
     return {
@@ -310,7 +393,7 @@ async function history() {
       when: m ? `${m[1].slice(4, 6)}/${m[1].slice(6)} ${m[2].slice(0, 2)}:${m[2].slice(2, 4)}` : r.name,
       case: r.cid, who: r.who || "", mode: r.mode, turns: r.turns || 0, status: n ? "제출" : "진행 중",
       total: n ? r.total : null, dx: n ? r.dx : null, truth: n ? r.truth : null, rescored: Math.max(0, n - 1),
-      cc: r.cc || "", live: !n, accuracy: n ? r.accuracy : null, scores: n ? r.scores : null,
+      cc: r.cc || "", live: !n, accuracy: n && r.accuracy != null ? Number(r.accuracy) : null, scores: n ? r.scores : null,
     };
   });
 }
@@ -318,7 +401,7 @@ async function history() {
 // ───────────── 증례 (만들기·고치기·지우기) ─────────────
 const BLANK_SCRIPT = ["현병력", "동반증상", "없는증상", "과거력", "약", "알레르기", "가족력", "사회력", "여성력", "이전진료"];
 async function nextCid() {
-  const used = new Set((await rest("GET", "cases?select=cid")).map((r: any) => r.cid));
+  const used = new Set(await db.caseCids());
   for (let n = 1; n < 703; n++) {
     let s = "", k = n;
     while (k) { const r = (k - 1) % 26; k = Math.floor((k - 1) / 26); s = String.fromCharCode(65 + r) + s; }
@@ -349,7 +432,8 @@ async function buildCase(cid: string, pmcid: string, truth: string, intro: strin
   const p = r.patient;
   Object.assign(r, { case_id: cid, pmcid, truth, status: "초안 (의학과 검수 전)",
     intro: intro || `${p.age}세 ${p.sex === "여" ? "여성" : "남성"}이 ${p.chief_complaint}(으)로 왔습니다.` });
-  await rest("POST", "cases", { cid, data: r, updated_at: new Date().toISOString() }, "resolution=merge-duplicates,return=minimal");
+  await db.caseUpsert(cid, r);
+  forgetCases(cid);
   return r;
 }
 async function caseSave(cid: string, data: any) {
@@ -357,11 +441,12 @@ async function caseSave(cid: string, data: any) {
   const p = data.patient || {};
   if (!data.truth) throw bad("정답(최종 진단)을 적어 주세요");
   if (!p.opening || !p.chief_complaint) throw bad("환자 첫마디와 주호소를 적어 주세요");
-  const old = await rest("GET", `cases?cid=eq.${q(cid)}&select=data,deleted_at`);
-  if (old.length && old[0].deleted_at) throw bad("지운 증례입니다");
-  if (old.length) await rest("POST", "case_history", { cid, data: old[0].data }, "return=minimal");  // 이전 판 보관
+  const old = await db.caseRow(cid);
+  if (old && old.deleted_at) throw bad("지운 증례입니다");
+  if (old) await db.caseHistory(cid, old.data);  // 이전 판 보관
   data.case_id = cid;
-  await rest("POST", "cases", { cid, data, updated_at: new Date().toISOString() }, "resolution=merge-duplicates,return=minimal");
+  await db.caseUpsert(cid, data);
+  forgetCases(cid);
   return data;
 }
 
@@ -394,15 +479,16 @@ async function authed(req: Request) {
 }
 async function login(ip: string, given: string): Promise<string | null> {
   const now = Date.now();
-  const f = (await rest("GET", `login_fails?ip=eq.${q(ip)}&select=n,until_ts`))[0];
-  if (f?.until_ts && Date.parse(f.until_ts) > now) return `너무 많이 틀렸습니다. ${Math.floor((Date.parse(f.until_ts) - now) / 60000) + 1}분 뒤에 다시 해 주세요.`;
+  const f = await db.failGet(ip);
+  const until = f?.until_ts ? new Date(f.until_ts).getTime() : 0;
+  if (until > now) return `너무 많이 틀렸습니다. ${Math.floor((until - now) / 60000) + 1}분 뒤에 다시 해 주세요.`;
   if (sameStr(String(given ?? ""), PASSWORD)) {
-    if (f) await rest("DELETE", `login_fails?ip=eq.${q(ip)}`, undefined, "return=minimal");
+    if (f) await db.failDel(ip);
     return null;
   }
   await sleep(1000);
   const n = (f?.n || 0) + 1;  // 같은 IP 에서 10번 틀리면 10분 잠금
-  await rest("POST", "login_fails", { ip, n: n >= 10 ? 0 : n, until_ts: n >= 10 ? new Date(now + 600e3).toISOString() : null }, "resolution=merge-duplicates,return=minimal");
+  await db.failSet(ip, n >= 10 ? 0 : n, n >= 10 ? new Date(now + 600e3).toISOString() : null);
   return "비밀번호가 틀렸습니다.";
 }
 
@@ -417,18 +503,19 @@ async function handle(req: Request): Promise<Response> {
   const qp = Object.fromEntries(url.searchParams);
   if (req.method === "GET") {
     if (path === "/api/auth") return reply({ ok: await authed(req), required: !!PASSWORD, days: AUTH_DAYS });
-    if (!(await authed(req))) throw bad("비밀번호를 입력해 주세요.", 401);
-    if (path === "/api/cases") {
-      const rows = await liveCases();
-      return reply({ cases: rows.map((r: any, i: number) => ({ no: i + 1, cid: r.cid, age: r.data.patient?.age, sex: r.data.patient?.sex, cc: r.data.patient?.chief_complaint })),
-        max_turns: P.MAX_TURNS, max_min: MAX_MIN, maxlen: P.MAXLEN });
+    if (path === "/api/boot") {  // 첫 화면에 필요한 것 한 번에: 로그인 확인 + 환자 + 진료 목록
+      if (!(await authed(req))) return reply({ ok: false, required: !!PASSWORD, days: AUTH_DAYS });
+      const [rows, hist] = await Promise.all([liveCases(), history()]);
+      return reply({ ok: true, required: !!PASSWORD, days: AUTH_DAYS, ...casesPayload(rows), history: hist });
     }
+    if (!(await authed(req))) throw bad("비밀번호를 입력해 주세요.", 401);
+    if (path === "/api/cases") return reply(casesPayload(await liveCases()));
     if (path === "/api/history") return reply({ rows: await history() });
     if (path === "/api/conv") return reply(await convView(await getEnc(safe(qp.name))));
     if (path === "/api/admin/cases") {
       const rows = await liveCases();
       return reply({ rows: rows.map((r: any, i: number) => {
-        const c = r.data, p = c.patient || {}, d = new Date(Date.parse(r.updated_at) + 9 * 3600e3);
+        const c = r.data, p = c.patient || {}, d = new Date(new Date(r.updated_at).getTime() + 9 * 3600e3);
         return { no: i + 1, cid: r.cid, who: `${p.age ?? ""}세 ${p.sex ?? ""}`, cc: p.chief_complaint, truth: c.truth, pmcid: c.pmcid, status: c.status || "",
           exam: (c.exam || []).length, tests: (c.tests || []).length, checklist: (c.checklist || []).length,
           updated: `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}` };
@@ -451,7 +538,7 @@ async function handle(req: Request): Promise<Response> {
 
   // 진료: 시작 · 한 턴 · 쓰다 만 SOAP · 제출 (모두 기록 이름 name 으로, 제출 전이면 언제든 이어서)
   if (path === "/api/start") {
-    const ids = sortCids((await rest("GET", "cases?deleted_at=is.null&select=cid")).map((r: any) => r.cid));
+    const ids = (await liveCases()).map((r: any) => r.cid);
     const cid = ids.includes(b.cid) ? b.cid : ids[(parseInt(b.no) || 1) - 1];
     if (!cid) throw bad("증례가 없습니다", 404);
     const C = await getCase(cid), p = C.patient || {}, mode = b.mode === "본선" ? "본선" : "예선";
@@ -459,11 +546,11 @@ async function handle(req: Request): Promise<Response> {
     let name = `${stamp()}_${cid}`;
     for (let i = 2; ; i++) {
       try {
-        await rest("POST", "encounters", { name, cid, mode, start, events: [], submits: [], meta: {}, usage: { calls: 0, in: 0, out: 0 },
-          turns: 0, n_submits: 0, cc: p.chief_complaint || "", who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "" }, "return=minimal");
+        await db.encInsert({ name, cid, mode, start, events: [], submits: [], meta: {}, usage: { calls: 0, in: 0, out: 0 },
+          turns: 0, n_submits: 0, cc: p.chief_complaint || "", who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "" });
         break;
       } catch (e) {
-        if (i > 5 || !String(e).includes("409")) throw e;
+        if (i > 5 || !/409|duplicate|23505/.test(`${(e as any)?.code ?? ""} ${e}`)) throw e;
         name = `${stamp()}_${cid}_${i}`;
       }
     }
@@ -482,7 +569,7 @@ async function handle(req: Request): Promise<Response> {
     const R = await getEnc(safe(b.name));
     if ((R.submits || []).length) throw bad("이미 제출한 진료입니다");
     const soap = Object.fromEntries([..."SOAP"].map((k) => [k, String((b.soap || {})[k] ?? "")]));
-    await rest("PATCH", `encounters?name=eq.${q(R.name)}`, { draft: { soap, dx: String(b.dx || "").trim() }, updated_at: new Date().toISOString() }, "return=minimal");
+    await db.encPatch(R.name, { draft: { soap, dx: String(b.dx || "").trim() } });
     return reply({ ok: true });
   }
   if (path === "/api/submit" || path === "/api/record/rescore") {
@@ -502,12 +589,12 @@ async function handle(req: Request): Promise<Response> {
   if (path === "/api/record/update") {
     const R = await getEnc(safe(b.name));
     R.meta = { ...(R.meta || {}), title: String(b.title || "").trim().slice(0, 100), memo: String(b.memo || "").trim().slice(0, 2000), updated: stamp() };
-    await rest("PATCH", `encounters?name=eq.${q(R.name)}`, { meta: R.meta, updated_at: new Date().toISOString() }, "return=minimal");
+    await db.encPatch(R.name, { meta: R.meta });
     return reply({ ok: true, meta: R.meta });
   }
   if (path === "/api/record/delete") {
     const R = await getEnc(safe(b.name));
-    await rest("PATCH", `encounters?name=eq.${q(R.name)}`, { deleted_at: new Date().toISOString() }, "return=minimal");  // 휴지통 (되살릴 수 있음)
+    await db.encPatch(R.name, { deleted_at: new Date() });  // 휴지통 (되살릴 수 있음)
     return reply({ ok: true });
   }
   // 증례 만들기·고치기·지우기
@@ -524,16 +611,19 @@ async function handle(req: Request): Promise<Response> {
   if (path === "/api/admin/case/save") return reply({ ok: true, case: await caseSave(safe(b.cid), b.data) });
   if (path === "/api/admin/case/delete") {
     const cid = safe(b.cid);
-    if (!(await rest("GET", `cases?cid=eq.${q(cid)}&deleted_at=is.null&select=cid`)).length) throw bad("증례가 없습니다", 404);
-    await rest("PATCH", `cases?cid=eq.${q(cid)}`, { deleted_at: new Date().toISOString() }, "return=minimal");
+    const row = await db.caseRow(cid);
+    if (!row || row.deleted_at) throw bad("증례가 없습니다", 404);
+    await db.caseDelete(cid);
+    forgetCases(cid);
     return reply({ ok: true });
   }
   // 로컬 판 자료 옮기기 (scripts/import_local.py)
   if (path === "/api/admin/import") {
     const cases = (b.cases || []).map((c: any) => ({ cid: safe(c.cid), data: c.data, updated_at: new Date().toISOString() }));
     const encs = (b.encounters || []).map((e: any) => ({ ...e, name: safe(e.name) }));
-    if (cases.length) await rest("POST", "cases", cases, "resolution=merge-duplicates,return=minimal");
-    if (encs.length) await rest("POST", "encounters", encs, "resolution=merge-duplicates,return=minimal");
+    for (const c of cases) await db.caseUpsert(c.cid, c.data);
+    if (encs.length) await db.encUpsert(encs);
+    forgetCases();
     return reply({ ok: true, cases: cases.length, encounters: encs.length });
   }
   throw bad("없는 주소", 404);

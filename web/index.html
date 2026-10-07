@@ -38,7 +38,7 @@
   --exam-c:#173b2a; --on-exam-c:#a8e8c5; --test-c:#3d2e12; --on-test-c:#f8d394;
   --scrim:rgba(0,0,0,.6); --shadow:0 8px 28px rgba(0,0,0,.5); }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-y:scroll;touch-action:manipulation}  /* 스크롤바 자리를 늘 잡아 화면이 옆으로 흔들리지 않게 */
 body{margin:0;background:var(--bg);color:var(--on);font:16px/1.6 "Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;letter-spacing:-.003em;-webkit-font-smoothing:antialiased}
 body[data-view="conv"]{overflow:hidden}
 h1{font-size:23px;line-height:1.3;font-weight:700;margin:0;letter-spacing:-.01em}
@@ -53,18 +53,18 @@ button{font:inherit;color:inherit}
 [hidden]{display:none!important}
 
 /* ── 버튼·칩·입력 ── */
-.btn{height:38px;padding:0 16px;border-radius:var(--r);border:0;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;flex:none;transition:background .15s,filter .15s}
+.btn{height:38px;padding:0 16px;border-radius:var(--r);border:0;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;flex:none;transition:background .15s}
 .btn .ms{font-size:20px;margin-left:-3px}
 .btn.filled{background:var(--pri);color:var(--on-pri)}
-.btn.filled:hover{filter:brightness(1.07)}
+.btn.filled:hover{background:color-mix(in srgb,var(--pri) 88%,#000)}
 .btn.tonal{background:var(--pri-c);color:var(--on-pri-c)}
-.btn.tonal:hover{filter:brightness(.97)}
+.btn.tonal:hover{background:color-mix(in srgb,var(--pri-c) 85%,var(--pri))}
 .btn.outline{background:transparent;border:1px solid var(--line2);color:var(--on)}
 .btn.text{background:transparent;color:var(--pri);padding:0 10px}
 .btn.outline:hover,.btn.text:hover{background:color-mix(in srgb,var(--pri) 8%,transparent)}
 .btn.danger{background:var(--bad);color:#fff}
 .btn.block{width:100%;height:46px;font-size:16px}
-.btn:disabled{opacity:.38;cursor:default;filter:none}
+.btn:disabled{opacity:.38;cursor:default}
 .iconbtn{width:38px;height:38px;border-radius:var(--r);border:0;background:transparent;color:var(--on2);display:inline-grid;place-items:center;cursor:pointer;flex:none;transition:background .15s}
 .iconbtn:hover{background:var(--s2)}
 .chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:4px;background:var(--s2);color:var(--on2);font-size:14px;font-weight:500;white-space:nowrap}
@@ -83,7 +83,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .seg button+button{border-left:1px solid var(--line2)}
 .seg button.on{background:var(--pri-c);color:var(--on-pri-c);font-weight:600}
 .search{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:var(--r);background:var(--s2);color:var(--on3)}
-.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--on);font:inherit;font-size:15px}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--on);font:inherit;font-size:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2)}
 .pad{padding:18px 20px}
 
@@ -108,7 +108,7 @@ body.drawer-hidden .drawer{transform:translateX(-100%)}
 .num{width:34px;height:34px;border-radius:var(--r);background:var(--s2);color:var(--on2);display:grid;place-items:center;font-weight:700;flex:none;font-size:15px}
 .num.pri{background:var(--pri);color:var(--on-pri)}
 .newbtn{width:100%;height:42px;justify-content:flex-start;padding:0 14px}
-.drawer-list{flex:1;overflow-y:auto;padding:0 8px 10px}
+.drawer-list{flex:1;overflow-y:auto;padding:0 8px 10px;scrollbar-gutter:stable;overscroll-behavior:contain}
 .grp{font-size:13px;font-weight:600;color:var(--on3);padding:14px 10px 4px}
 .ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r);text-decoration:none;cursor:pointer;border:0;background:transparent;width:100%;text-align:left}
 .ni:hover{background:var(--s2)}
@@ -157,7 +157,7 @@ body.drawer-hidden .main{margin-left:0}
 .ctab.on{color:var(--pri)}
 .ctab.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--pri)}
 .ctab .dot{width:6px;height:6px;border-radius:50%;background:var(--pri)}
-.cbody{flex:1;overflow-y:auto}
+.cbody{flex:1;overflow-y:auto;scrollbar-gutter:stable;overscroll-behavior:contain}
 .pane{max-width:880px;margin:0 auto;padding:22px 20px 48px}
 .log{max-width:880px;margin:0 auto;padding:22px 20px 16px;display:flex;flex-direction:column;gap:12px}
 .row{display:flex;gap:10px;align-items:flex-end}
@@ -246,7 +246,9 @@ mark.hl{color:inherit;background:transparent;border-radius:2px;padding:1px 0;cur
 mark.hl.good{background:color-mix(in srgb,var(--ok) 15%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--ok) 75%,transparent)}
 mark.hl.warn{background:color-mix(in srgb,#d69a2d 20%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
 mark.hl.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
-mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
+mark.hl.good:hover,mark.hl.good.act{background:color-mix(in srgb,var(--ok) 30%,transparent)}
+mark.hl.warn:hover,mark.hl.warn.act{background:color-mix(in srgb,#d69a2d 38%,transparent)}
+mark.hl.bad:hover,mark.hl.bad.act{background:color-mix(in srgb,var(--bad) 30%,transparent)}
 .tip-pop{position:fixed;z-index:85;max-width:min(340px,90vw);background:#23262d;color:#eef0f3;border-radius:var(--r);padding:9px 12px;font-size:14px;line-height:1.5;box-shadow:var(--shadow);pointer-events:none;opacity:0;transition:opacity .1s}
 .tip-pop.on{opacity:1}
 .tip-pop b{display:block;margin-bottom:2px}
@@ -258,9 +260,21 @@ mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
 .hl-legend .bad i{background:color-mix(in srgb,var(--bad) 30%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
 .orig-box{border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);padding:16px 18px}
 .orig-box .log{padding:0;max-width:none}
+.res-box{max-height:min(55vh,500px);overflow-y:auto;overscroll-behavior:contain}
+.fb-sheet{position:fixed;left:0;right:0;bottom:0;z-index:86;background:#23262d;color:#eef0f3;border-radius:var(--r3) var(--r3) 0 0;padding:14px 12px calc(16px + env(safe-area-inset-bottom)) 18px;box-shadow:var(--shadow);transform:translateY(105%);transition:transform .18s ease}
+.fb-sheet.on{transform:none}
+.fb-sheet-in{display:flex;gap:8px;align-items:flex-start}
+.fb-sheet-in>div{flex:1;min-width:0;font-size:15px;line-height:1.55}
+.fb-sheet b{display:block;margin-bottom:4px}
+.fb-sheet .good{color:#8fe0b3} .fb-sheet .warn{color:#f6cf7f} .fb-sheet .bad{color:#ffb0a8}
+.fb-sheet q{display:block;color:#c9ccd3;margin-bottom:6px;quotes:none}
+.fb-sheet .iconbtn{color:#c9ccd3}
+.skel .sk{height:42px;border-radius:10px;background:linear-gradient(90deg,var(--s2) 25%,var(--s1) 50%,var(--s2) 75%);background-size:200% 100%;animation:sh 1.2s linear infinite;width:55%}
+.skel .sk:nth-child(even){align-self:flex-end;width:40%}
+@keyframes sh{to{background-position:-200% 0}}
 
 /* 결과 탭 */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r2);background:var(--surface)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:var(--r2);background:var(--surface)}
 .stat{padding:16px 18px;border-left:1px solid var(--line)}
 .stat:first-child{border-left:0}
 .stat .k{font-size:13.5px;color:var(--on2)}
@@ -290,7 +304,7 @@ mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
 .acc>summary .ms{color:var(--on3);transition:transform .15s}
 .acc[open]>summary .ms.chev{transform:rotate(180deg)}
 .acc>summary .meta{font-weight:400;margin-left:auto}
-.acc-b{padding:0 16px 14px}
+.acc-b{padding:0 16px 14px;max-height:min(50vh,440px);overflow-y:auto;overscroll-behavior:contain}
 .ck{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
 .ck:last-child{border-bottom:0}
 .ck-main{flex:1;min-width:0}
@@ -415,9 +429,8 @@ mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
   .pane{padding:18px 16px 40px}
   .bub,.tn{max-width:88%}
   .composer-in{padding:8px 10px 10px}
-  .stats{grid-template-columns:1fr 1fr}
-  .stat:nth-child(3){border-left:0}
-  .stat:nth-child(n+3){border-top:1px solid var(--line)}
+  .stat{padding:12px 14px}
+  .stat .v{font-size:22px}
   .dom-why{padding-left:12px}
   .sx{grid-template-columns:1fr}
   .page-head{flex-wrap:nowrap;align-items:center}
@@ -469,7 +482,7 @@ mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
       <div class="conv-head"><div class="ch-in">
         <div class="ch-row">
           <div class="pt-info"><div class="pt-name" id="cvName"></div><div class="pt-sub" id="cvSub"></div></div>
-          <div class="ch-chips"><span class="chip" id="cvTurn"></span><span class="chip" id="cvTime"></span></div>
+          <div class="ch-chips"><span class="chip" id="cvTurn"></span></div>
           <button class="iconbtn" id="cvVit" title="활력징후"><span class="ms">monitor_heart</span></button>
           <button class="iconbtn" id="cvMore" title="더 보기"><span class="ms">more_vert</span></button>
         </div>
@@ -497,16 +510,15 @@ mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
 <div id="login"><form class="login-card" id="pwForm">
   <div class="hero"><span class="ms f">stethoscope</span></div>
   <h1>CPX 가상 환자</h1>
-  <p class="dlg-msg">비밀번호를 입력하세요</p>
   <input type="text" name="username" value="cpx" autocomplete="username" hidden>
   <input class="inp" id="pw" type="password" autocomplete="current-password" placeholder="비밀번호">
   <div class="pw-err" id="pwErr"></div>
   <button class="btn filled block" id="pwGo">들어가기</button>
-  <p class="meta">한 번 들어오면 이 브라우저에서 <span id="pwDays">1</span>일 동안 유지됩니다</p>
 </form></div>
 <div class="busy" id="busy"><div class="busy-card"><div class="spinner"></div><span id="busyMsg"></span></div></div>
 <div id="toasts"></div>
 <div class="tip-pop" id="tipPop"></div>
+<div class="fb-sheet" id="fbSheet"><div class="fb-sheet-in"><div id="fbSheetBody"></div><button class="iconbtn" id="fbSheetX" title="닫기"><span class="ms">close</span></button></div></div>
 
 <script>
 /* ───── 기본 도구 ───── */
@@ -709,7 +721,7 @@ async function route(){
   }
   const m = /^#c\/([^/]+)(?:\/(chat|soap|result))?$/.exec(h) || /^#r\/([^/]+)$/.exec(h);
   if (m && CV && CV.name === m[1]) { prevHash = h; setTab(m[2] || "chat", true); renderSide(); return; }  // 같은 진료 안에서 탭만 바꿈
-  leaveConv();
+  navSeq++; leaveConv();
   prevHash = h; closeDrawer(); closeMenu(); renderSide(); setCtx("");
   try {
     if (m) await openConv(m[1], m[2] || "chat");
@@ -769,7 +781,7 @@ function openPicker(){
 }
 async function startConv(cid, mode){
   closeDrawer(); setBusy(true, "환자를 부르는 중…");
-  try { const v = await api("/api/start", {cid, mode}); await refreshSide(); go("#c/" + v.name); }
+  try { const v = await api("/api/start", {cid, mode}); CONVC.set(v.name, v); upsertRow(v); go("#c/" + v.name); }
   catch(e){ fail(e); } finally { setBusy(false); }
 }
 
@@ -778,31 +790,70 @@ function leaveConv(){
   if (CV && !CV.done) DRAFT[CV.name] = $("#txt").value;
   CV = null; clearInterval(timer); closeMenu();
 }
+const CONVC = new Map(), PREF = new Set();  // 연 진료를 기억 (다시 열 때 바로 보여 주고 뒤에서 새로 받아 맞춘다)
+let navSeq = 0;
+const sigOf = v => JSON.stringify([(v.events || []).length, (v.submits || []).length, v.meta || {}, v.done]);
+const fetchConv = name => api("/api/conv?name=" + encodeURIComponent(name));
 async function openConv(name, tab){
-  const v = await api("/api/conv?name=" + encodeURIComponent(name));
-  CV = v; CV.seq = ++renderSeq; CV.t0 = Date.now() - (v.elapsed_sec || 0) * 1000; soapEdit = false;
+  const my = ++navSeq, cached = CONVC.get(name);
+  if (cached) showConv(cached, tab); else showConvLoading(name, tab);
+  let fresh;
+  try { fresh = await fetchConv(name); } catch(e){ if (cached && !e.auth) return; throw e; }
+  if (my !== navSeq) return;  // 그사이 다른 화면으로 갔음
+  if (!cached) { CONVC.set(name, fresh); showConv(fresh, tab); return; }
+  if (PENDING.has(name) || sigOf(cached) === sigOf(fresh)) return;
+  CONVC.set(name, fresh);
+  if (!(cvTab === "soap" && body().contains(document.activeElement))) showConv(fresh, cvTab);  // 쓰는 중이면 건드리지 않음
+}
+function showConvLoading(name, tab){
+  const r = HIST.find(x => x.name === name);
+  CV = null;
+  $("#cvName").textContent = r ? (r.title || caseLabel(r.case)) : "";
+  $("#cvSub").textContent = r ? `${r.cc || caseOf(r.case)?.cc || ""} · ${r.mode || ""}` : "";
+  $("#cvTurn").hidden = true; $("#composer").hidden = true;
+  $$("#cvTabs .ctab").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
+  body().innerHTML = `<div class="log skel">${'<div class="sk"></div>'.repeat(6)}</div>`;
+  show("conv");
+}
+function showConv(v, tab){
+  if (!CV || CV.name !== v.name) soapEdit = false;
+  CV = v; CV.seq = ++renderSeq;
   const p = v.patient || {}, c = caseOf(v.case);
   if (c && PSEL !== "all" && PSEL !== c.cid) setPatient(c.cid);
   $("#cvName").textContent = `${p.name || ""} · ${p.age}세 ${p.sex || ""}`;
-  $("#cvSub").textContent = `${c ? `환자 ${c.no} · ` : ""}${p.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
+  $("#cvSub").textContent = `${p.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
   setCtx(`${p.name || ""} · ${p.cc || ""}`);
   const tb = $("#act [data-a=TEST]"); tb.disabled = v.mode !== "본선"; tb.title = tb.disabled ? "검사는 본선에서만 할 수 있습니다" : "TEST";
   $("#txt").value = DRAFT[v.name] || "";
   setAct("SAY", true); updHead();
-  clearInterval(timer); if (!v.done) timer = setInterval(updHead, 1000);
   show("conv"); setTab(tab, true);
 }
 function updHead(){
   if (!CV) return;
-  $("#cvTurn").textContent = `${CV.turn} / ${CV.max_turns}턴`;
-  $("#cvTurn").classList.toggle("warn", !CV.done && CV.turn >= CV.max_turns - 5);
-  const sub = CV.submit;
-  if (CV.done) { $("#cvTime").className = "chip " + scoreCls(sub.total); $("#cvTime").innerHTML = `${I("insights")}${sub.total}점`; return; }
-  const el = Math.floor((Date.now() - CV.t0) / 1000);
-  $("#cvTime").className = "chip hide-xs";
-  if (CV.max_min) { const rem = Math.max(0, CV.max_min * 60 - el); $("#cvTime").innerHTML = `${I("timer")}${mmss(rem)}`; $("#cvTime").classList.toggle("warn", rem <= 180); }
-  else $("#cvTime").innerHTML = `${I("schedule")}${mmss(el)}`;
+  const t = $("#cvTurn");
+  t.hidden = !!CV.done;  // 제출한 진료는 결과 탭에 있으므로 숨김
+  t.textContent = `${CV.turn} / ${CV.max_turns}턴`;
+  t.classList.toggle("warn", !CV.done && CV.turn >= CV.max_turns - 5);
 }
+/* 사이드바에 마우스를 올리면(휴대폰은 닿으면) 미리 받기 */
+function prefetch(a){
+  const m = /#c\/([^/]+)/.exec(decodeURIComponent(a.getAttribute("href") || ""));
+  if (!m || CONVC.has(m[1]) || PREF.has(m[1])) return;
+  PREF.add(m[1]);
+  fetchConv(m[1]).then(v => { if (!CONVC.has(m[1])) CONVC.set(m[1], v); }).catch(() => {}).finally(() => PREF.delete(m[1]));
+}
+let pfTimer = null;
+$("#sideHist").addEventListener("mouseover", e => { const a = e.target.closest(".ni"); if (a) { clearTimeout(pfTimer); pfTimer = setTimeout(() => prefetch(a), 120); } });
+$("#sideHist").addEventListener("touchstart", e => { const a = e.target.closest(".ni"); if (a) prefetch(a); }, {passive: true});
+/* 진료 목록을 서버에 다시 묻지 않고 바로 고친다 */
+function rowOf(v){
+  const s = v.submit, p = v.patient || {};
+  return {name: v.name, title: v.meta?.title || "", memo: v.meta?.memo || "", case: v.case, who: p.age ? `${p.age}세 ${p.sex || ""}`.trim() : "",
+    mode: v.mode, turns: v.turn, status: v.done ? "제출" : "진행 중", total: s ? s.total : null, dx: s ? s.dx : null, truth: s ? s.truth : null,
+    rescored: Math.max(0, (v.submits || []).length - 1), cc: p.cc || "", live: !v.done, accuracy: s ? s.judge?.accuracy ?? null : null, scores: s ? s.scores : null};
+}
+function upsertRow(v){ const r = rowOf(v), i = HIST.findIndex(x => x.name === v.name); if (i >= 0) HIST[i] = r; else HIST.unshift(r); renderSide(); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && CASES.length) refreshSide(); });  // 다른 기기·팀원 변경 반영
 function setTab(t, fromRoute){
   if (!CV) return;
   cvTab = t;
@@ -820,7 +871,8 @@ $("#cvMore").onclick = e => { if (CV) menu(e.currentTarget, [
   "-",
   {icon:"delete", label:"이 진료 삭제", danger:true, onClick: async () => {
     if (!await ask("진료 삭제", "이 진료 기록을 휴지통(results/sp_sim/_trash)으로 옮깁니다.", "삭제", true)) return;
-    try { await api("/api/record/delete", {name:CV.name}); toast("휴지통으로 옮겼습니다"); CV = null; await refreshSide(); go("#"); } catch(e){ fail(e); }
+    const name = CV.name;
+    try { await api("/api/record/delete", {name}); toast("휴지통으로 옮겼습니다"); CONVC.delete(name); HIST = HIST.filter(x => x.name !== name); CV = null; renderSide(); go("#"); } catch(e){ fail(e); }
   }}]); };
 
 /* 대화 탭 */
@@ -832,7 +884,7 @@ function vitHTML(v){ return `<div class="vit-grid">${vitParts(v).map(([k, x]) =>
 const hPt = t => `<div class="row pt"><div class="av">${I("person")}</div><div class="bub">${esc(t)}</div></div>`;
 const hDoc = (t, a, turn, rej) => { const k = ACTS[a] || ACTS.SAY; return `<div class="row doc${rej ? " rej" : ""}">${turn ? `<span class="turn">${turn}</span>` : ""}<div class="bub">${a !== "SAY" ? `<span class="bub-act">${I(k.icon)}${k.label}</span>` : ""}${esc(t)}</div></div>`; };
 const hRes = (t, a) => { const k = ACTS[a] || ACTS.EXAM; return `<div class="event ${a === "TEST" ? "test" : "exam"}">${I(k.icon)}<div>${resBody(t)}</div></div>`; };
-const hRej = why => `<div class="note-line">${I("block")}<span>${esc(why)}<small>반려 · 턴 차감 없음</small></span></div>`;
+const hRej = why => `<div class="note-line">${I("block")}<span>${esc(why)}<small>반려</small></span></div>`;
 const hInfo = t => `<div class="note-line info">${I("info")}<span>${esc(t)}</span></div>`;
 const hTyping = () => `<div class="row pt typing"><div class="av">${I("person")}</div><div class="bub dots"><i></i><i></i><i></i></div></div>`;
 const vcls = v => v in VERD ? v : "warn";
@@ -857,18 +909,34 @@ let tipEl = null;
 function showTip(m){
   if (tipEl) tipEl.classList.remove("act");
   tipEl = m; m.classList.add("act");
-  const vd = m.dataset.v, lab = (VERD[vd] || VERD.warn)[1];
-  TIP().innerHTML = `<b class="${esc(vd)}">${esc(lab)}${m.dataset.tag ? " · " + esc(m.dataset.tag) : ""}</b>${esc(m.dataset.note || "")}`;
+  TIP().innerHTML = tipHTML(m) + esc(m.dataset.note || "");
   TIP().classList.add("on");
   const r = m.getClientRects()[0] || m.getBoundingClientRect(), t = TIP(), w = t.offsetWidth, h = t.offsetHeight;
   t.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + "px";
   t.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + "px";
 }
 function hideTip(){ TIP().classList.remove("on"); if (tipEl) tipEl.classList.remove("act"); tipEl = null; }
-document.addEventListener("mouseover", e => { const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); });
-document.addEventListener("mouseout", e => { const m = e.target.closest?.("mark[data-tip]"); if (m && !m.contains(e.relatedTarget)) hideTip(); });
-document.addEventListener("click", e => { const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); else if (tipEl) hideTip(); });
-document.addEventListener("scroll", hideTip, true);
+let lastPtr = matchMedia("(hover: hover)").matches ? "mouse" : "touch";
+document.addEventListener("pointerdown", e => { lastPtr = e.pointerType || "mouse"; }, true);
+const canHover = () => lastPtr === "mouse";
+function tipHTML(m){ const vd = m.dataset.v, lab = (VERD[vd] || VERD.warn)[1]; return `<b class="${esc(vd)}">${esc(lab)}${m.dataset.tag ? " · " + esc(m.dataset.tag) : ""}</b>`; }
+function showSheet(m){  // 휴대폰: 누른 하이라이트의 피드백을 화면 아래에
+  if (tipEl) tipEl.classList.remove("act");
+  tipEl = m; m.classList.add("act");
+  const said = m.textContent.trim();
+  $("#fbSheetBody").innerHTML = tipHTML(m) + `<q>${esc(said.length > 60 ? said.slice(0, 60) + "…" : said)}</q>${esc(m.dataset.note || "")}`;
+  $("#fbSheet").classList.add("on");
+}
+function hideSheet(){ $("#fbSheet").classList.remove("on"); if (tipEl) tipEl.classList.remove("act"); tipEl = null; }
+$("#fbSheetX").onclick = hideSheet;
+document.addEventListener("pointerover", e => { if (e.pointerType !== "mouse") return; lastPtr = "mouse"; const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); });
+document.addEventListener("pointerout", e => { if (e.pointerType !== "mouse") return; const m = e.target.closest?.("mark[data-tip]"); if (m && !m.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener("click", e => {
+  const m = e.target.closest?.("mark[data-tip]");
+  if (canHover()) { if (m) showTip(m); else if (tipEl) hideTip(); return; }
+  if (m) showSheet(m); else if (!e.target.closest?.("#fbSheet") && $("#fbSheet").classList.contains("on")) hideSheet();
+});
+document.addEventListener("scroll", () => { if (canHover()) hideTip(); }, true);
 function convHTML(v, notes){  // 대화 원문. notes 를 주면 의사 발화에 색 하이라이트 + 마우스 올리면 피드백
   const p = v.patient || {};
   let h = hPt(p.opening);
@@ -884,7 +952,6 @@ function renderChat(){
   const v = CV;
   let h = convHTML(v);
   if (PENDING.has(v.name)) h += hTyping();
-  if (!v.done && !(v.events || []).length) h += hInfo("환자에게 첫 질문을 해 보세요. SOAP는 'SOAP 기록' 탭에서 씁니다.");
   body().innerHTML = `<div class="log" id="log">${h}</div>`;
   $("#sendBtn").disabled = PENDING.has(v.name);
   scrollEnd(); if (!v.done && !isMobile()) $("#txt").focus();
@@ -914,11 +981,13 @@ async function send(){
   let r = null, err = null;
   try { r = await api("/api/act", {name, act:a, text}); } catch(e){ err = e; }
   PENDING.delete(name);
-  if (r && CV && CV.name === name) {  // 화면 상태에도 반영 (탭을 오가도 다시 그릴 수 있게)
+  const obj = CONVC.get(name) || (CV && CV.name === name ? CV : null);
+  if (r && obj) {  // 기억해 둔 진료에도 반영 (탭·진료를 오가도 다시 그릴 수 있게)
     const m = !r.ok && /^반려:\s*(.*?)\s*\(턴 차감 없음\)$/.exec(r.out || "");
-    if (r.ok) CV.events.push({type:"turn", turn:r.turn, act:r.act, text, out:r.out});
-    else if (m) CV.events.push({type:"reject", act:a, text, why:m[1]});
-    CV.turn = r.turn; CV.rejected = r.rejected;
+    if (r.ok) obj.events.push({type:"turn", turn:r.turn, act:r.act, text, out:r.out});
+    else if (m) obj.events.push({type:"reject", act:a, text, why:m[1]});
+    obj.turn = r.turn; obj.rejected = r.rejected;
+    if (CV && CV.name === name && CV !== obj) { CV.events = obj.events; CV.turn = obj.turn; CV.rejected = obj.rejected; }
   }
   if (CV && CV.name === name && CV.seq === seq && cvTab === "chat" && log()) {
     $$("#log .typing").forEach(x => x.remove());
@@ -933,7 +1002,7 @@ async function send(){
     }
     scrollEnd(); updHead(); $("#sendBtn").disabled = false; if (!isMobile()) $("#txt").focus();
   } else if (CV && CV.name === name) { updHead(); if (cvTab === "chat") renderChat(); }
-  refreshSide();
+  if (obj) upsertRow(obj);
 }
 
 /* SOAP 기록 탭: 제출 전엔 쓰기(자동 저장), 제출 뒤엔 문장별 평가 */
@@ -941,8 +1010,8 @@ let draftTimer = null;
 function soapForm(pre, submitLabel){
   const s = pre?.soap || {};
   const fld = (k, hint) => `<div class="fld soap-f"><label><span class="soap-k">${k}</span>${hint}</label><textarea class="inp" data-k="${k}" rows="3">${esc(s[k] || "")}</textarea></div>`;
-  return `${fld("S","환자가 말한 것 — 주호소·현병력·과거력·약·사회력·가족력")}${fld("O","관찰·측정 — 활력징후·진찰 소견")}${fld("A","평가 — 주진단 가설·근거·감별")}${fld("P","계획 — 검사·처치·안전·추적·설명")}
-    <div class="fld"><label>주진단 1개</label><input class="inp" id="sDx" value="${esc(pre?.dx || "")}" placeholder="예) 급성 간헐성 포르피린증"></div>
+  return `${fld("S","주관적")}${fld("O","객관적")}${fld("A","평가")}${fld("P","계획")}
+    <div class="fld"><label>주진단</label><input class="inp" id="sDx" value="${esc(pre?.dx || "")}" placeholder="예) 급성 간헐성 포르피린증"></div>
     <div class="soap-foot"><span class="meta" id="draftSt"></span><span class="spacer"></span>${soapEdit ? `<button class="btn outline" id="soapCancel">취소</button>` : ""}<button class="btn filled" id="soapGo">${I(soapEdit ? "refresh" : "assignment_turned_in")}${submitLabel}</button></div>`;
 }
 function readSoap(){ return {soap: Object.fromEntries($$("#cvBody textarea[data-k]").map(t => [t.dataset.k, t.value])), dx: $("#sDx").value.trim()}; }
@@ -950,7 +1019,7 @@ function growAll(){ const g = t => { t.style.height = "auto"; t.style.height = (
 function renderSoap(){
   const v = CV;
   if (!v.done) {
-    body().innerHTML = `<div class="pane"><p class="lead">대화·진찰로 얻은 것만 씁니다. 검사 결과가 없으면 필요한 검사는 P에 계획으로 씁니다. 쓰는 대로 저장됩니다.</p>${soapForm(v.draft, "제출하고 채점")}</div>`;
+    body().innerHTML = `<div class="pane">${soapForm(v.draft, "제출하고 채점")}</div>`;
     growAll();
     $("#cvBody").oninput = () => {
       v.draft = readSoap(); $("#draftSt").textContent = "저장 중…";
@@ -963,31 +1032,31 @@ function renderSoap(){
       const {soap, dx} = readSoap();
       if (!dx) { toast("주진단을 적어 주세요", true); $("#sDx").focus(); return; }
       if (!await ask("제출하고 채점", "제출하면 이 진료가 끝나고 더 이상 대화할 수 없습니다.", "제출")) return;
-      clearTimeout(draftTimer); setBusy(true, "채점 중입니다 (30초~1분)");
+      clearTimeout(draftTimer); setBusy(true, "채점 중입니다 (1~2분)");
       try {
         const nv = await api("/api/submit", {name:v.name, soap, dx});
-        delete DRAFT[v.name]; await refreshSide();
-        if (CV === v) { await openConv(v.name, "result"); history.replaceState(null, "", "#c/" + v.name + "/result"); prevHash = "#c/" + v.name + "/result"; renderSide(); }
+        delete DRAFT[v.name]; CONVC.set(v.name, nv); upsertRow(nv);
+        if (CV === v) { showConv(nv, "result"); history.replaceState(null, "", "#c/" + v.name + "/result"); prevHash = "#c/" + v.name + "/result"; renderSide(); }
       } catch(e){ fail(e); } finally { setBusy(false); }
     };
     return;
   }
   const sub = v.submit, j = sub.judge || {};
   if (soapEdit) {
-    body().innerHTML = `<div class="pane"><p class="lead">대화는 그대로 두고, 고친 기록으로 다시 채점합니다.</p>${soapForm({soap:sub.soap, dx:sub.dx}, "다시 채점")}</div>`;
+    body().innerHTML = `<div class="pane">${soapForm({soap:sub.soap, dx:sub.dx}, "다시 채점")}</div>`;
     growAll(); $("#cvBody").oninput = null;
     $("#soapCancel").onclick = () => { soapEdit = false; renderSoap(); };
     $("#soapGo").onclick = async () => {
       const {soap, dx} = readSoap();
       if (!dx) { toast("주진단을 적어 주세요", true); return; }
-      setBusy(true, "다시 채점하는 중 (30초~1분)");
-      try { await api("/api/record/rescore", {name:v.name, soap, dx}); refreshSide(); await openConv(v.name, "soap"); toast("다시 채점했습니다"); }
+      setBusy(true, "다시 채점하는 중 (1~2분)");
+      try { const nv = await api("/api/record/rescore", {name:v.name, soap, dx}); CONVC.set(v.name, nv); upsertRow(nv); soapEdit = false; if (CV === v) showConv(nv, "result"); toast("다시 채점했습니다"); }
       catch(e){ fail(e); } finally { setBusy(false); }
     };
     return;
   }
   $("#cvBody").oninput = null;
-  let h = `<div class="pane"><div class="page-head" style="margin-bottom:10px"><div class="ph-main"><p class="meta">제출한 기록 그대로입니다. 문장별 피드백은 결과 탭에서 봅니다.</p></div>
+  let h = `<div class="pane"><div class="page-head" style="margin-bottom:10px;justify-content:flex-end">
     <div class="ph-act"><button class="btn outline" id="reBtn">${I("refresh")}<span class="t">고쳐서 다시 채점</span></button></div></div>
     <div class="orig-box"><div class="soap-orig">${[..."SOAP"].map(k => `<span class="soap-k">${k}</span><div class="txt">${esc((sub.soap || {})[k]) || '<span class="meta">비어 있음</span>'}</div>`).join("")}
       <span class="soap-k">Dx</span><div class="txt"><b>${esc(sub.dx)}</b></div></div></div></div>`;
@@ -1012,20 +1081,18 @@ function renderResult(){
   }
   const sub = v.submit, j = sub.judge || {}, pf = sub.patient || {}, sc = sub.scores || {}, u = sub.usage || {};
   const acc = j.accuracy ?? 0, [vc, vi, vt] = acc >= 90 ? ["g","check_circle","주진단 정답"] : acc >= 40 ? ["y","error","주진단 부분 정답"] : ["r","cancel","주진단 오답"];
-  const secs = Math.round((sub.minutes || 0) * 60);
   let h = `<div class="pane"><div class="stats">
       <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${sub.total}<small>/ 100</small></div></div>
       <div class="stat"><div class="k">사용 턴</div><div class="v">${sub.turns}<small>/ ${v.max_turns}</small></div></div>
-      <div class="stat"><div class="k">걸린 시간</div><div class="v">${Math.floor(secs / 60)}<small>분</small> ${secs % 60}<small>초</small></div></div>
       <div class="stat"><div class="k">반려</div><div class="v">${sub.rejected}<small>회</small></div></div></div>
     ${sub.overtime ? `<div class="callout">${I("timer")}<b>시간 초과로 무효(0점) 처리됐습니다</b></div>` : ""}
     <div class="dxrow"><span class="chip ${vc}">${I(vi, 1)}${vt}</span><span><span class="lbl">제출</span>${esc(sub.dx)}</span><span><span class="lbl">정답</span>${esc(sub.truth)}</span></div>
-    <div class="sec-h"><h3>영역별 점수</h3><span class="meta">누르면 이유</span></div>
+    <div class="sec-h"><h3>영역별 점수</h3></div>
     <div class="domains">${DOMAINS.map(([d, mx]) => { const x = sc[d] ?? 0, r = x / mx;
       return `<button class="dom" aria-expanded="false"><span class="dn">${d}</span><span class="bar"><i class="${r >= .7 ? "g" : r >= .4 ? "y" : "r"}" style="width:${Math.round(100 * r)}%"></i></span><span class="ds">${x}<small> / ${mx}</small></span>${I("expand_more")}</button><div class="dom-why" hidden>${domWhy(d, j)}</div>`; }).join("")}</div>`;
   const missed = (j.red_flags || []).filter(x => !x.checked);
   const legend = (arr) => { const c = k => arr.filter(x => vcls(x.verdict) === k).length;
-    return `<div class="hl-legend"><span class="good"><i></i>좋음 ${c("good")}</span><span class="warn"><i></i>아쉬움 ${c("warn")}</span><span class="bad"><i></i>틀림 ${c("bad")}</span><span>· ${isMobile() ? "누르면" : "마우스를 올리면"} 피드백</span></div>`; };
+    return `<div class="hl-legend"><span class="good"><i></i>좋음 ${c("good")}</span><span class="warn"><i></i>아쉬움 ${c("warn")}</span><span class="bad"><i></i>틀림 ${c("bad")}</span></div>`; };
   const sents = j.soap_sentences || [], lab = {};
   for (const x of sents) lab[String(x.id || "").toUpperCase()] = x;
   const split = sub.soap_split;
@@ -1033,31 +1100,31 @@ function renderResult(){
     + `<span class="soap-k">Dx</span><div class="txt"><mark ${markAttrs(acc >= 90 ? "good" : acc >= 40 ? "warn" : "bad", vt.replace("주진단 ", ""), "정답 " + (sub.truth || "") + (j.accuracy_note ? " · " + j.accuracy_note : ""))}><b>${esc(sub.dx)}</b></mark></div>`;
   if (missed.length) h += `<div class="callout">${I("report", 1)}<div><b>놓치면 위험한 것 ${missed.length}개를 확인하지 않았습니다</b><ul>${missed.map(x => `<li>${esc(x.item)}</li>`).join("")}</ul></div></div>`;
   const miss = [...(j.soap_top || []), ...(j.soap_more || [])];
-  h += `<div class="sec-h"><h3>SOAP 기록</h3>${split && sents.length ? legend(sents) : `<span class="meta">다시 채점하면 문장별 하이라이트가 붙습니다</span>`}</div>
-    <div class="orig-box"><div class="soap-orig">${soapBody}</div></div>
+  h += `<div class="sec-h"><h3>SOAP 기록</h3>${split && sents.length ? legend(sents) : `<span class="meta">다시 채점하면 문장별 평가</span>`}</div>
+    <div class="orig-box res-box"><div class="soap-orig">${soapBody}</div></div>
     ${miss.length ? `<details class="acc"><summary>${I("playlist_add")}빠진 것·고칠 점<span class="meta">${miss.length}개</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${miss.map(missItem).join("")}</div></details>` : ""}`;
   const tnotes = {}; for (const n of j.turn_notes || []) tnotes[+n.turn] = n;
-  h += `<div class="sec-h"><h3>대화</h3>${(j.turn_notes || []).length ? legend(j.turn_notes) : `<span class="meta">다시 채점하면 턴별 하이라이트가 붙습니다</span>`}</div>
-    <div class="orig-box"><div class="log">${convHTML(v, tnotes)}</div></div>`;
+  h += `<div class="sec-h"><h3>대화</h3>${(j.turn_notes || []).length ? legend(j.turn_notes) : `<span class="meta">다시 채점하면 턴별 평가</span>`}</div>
+    <div class="orig-box res-box"><div class="log">${convHTML(v, tnotes)}</div></div>`;
   const ck = [...(j.checklist || [])], order = {"지어낸 기록":0, "미수집":1, "기록 누락":2, "정상":3};
   ck.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
   const tc = t => t === "정상" ? "g" : t === "지어낸 기록" ? "r" : "y";
   if (ck.length) h += `<details class="acc"><summary>${I("checklist")}체크리스트<span class="meta">문제 ${ck.filter(c => c.tag && c.tag !== "정상").length} / ${ck.length}</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${ck.map(c => `<div class="ck"><div class="ck-main"><div class="ck-t">${esc(c.item)}</div>
       <div class="ck-m"><span class="${c.asked ? "yes" : "no"}">${I(c.asked ? "check" : "close")}물음</span><span class="${c.recorded ? "yes" : "no"}">${I(c.recorded ? "check" : "close")}기록</span>${c.turn && c.turn !== "턴 없음" ? `<span>${esc(c.turn)}</span>` : ""}</div></div>${c.tag ? `<span class="chip sm ${tc(c.tag)}">${esc(c.tag)}</span>` : ""}</div>`).join("")}</div></details>`;
-  h += `<details class="acc"><summary>${I("person")}환자 평가<span class="meta">의사소통 ${sc["의사소통"] ?? 0} / 15</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">
+  h += `<details class="acc"><summary>${I("person")}환자 평가${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">
       <ul class="lst">${(pf.good || []).map(x => `<li><span class="g">${I("thumb_up")}</span><span>${esc(x)}</span></li>`).join("")}${(pf.regret || []).map(x => `<li><span class="r">${I("sentiment_dissatisfied")}</span><span>${esc(x)}</span></li>`).join("")}</ul>
       ${pf.wish ? `<div class="quote">${esc(pf.wish)}</div>` : ""}
       ${pf.ppi ? `<div class="ppi">${Object.entries(pf.ppi).map(([k, x]) => `<div>${esc(k)}${(pf.ppi_turn || {})[k] ? ` <span class="meta" style="font-size:13px">${esc(pf.ppi_turn[k])}</span>` : ""}</div><span class="meter">${[1,2,3].map(i => `<i class="${+x >= i ? "on" : ""}"></i>`).join("")}</span>`).join("")}</div>` : ""}
     </div></details>`;
-  h += `<details class="acc"><summary>${I("menu_book")}모범 답안<span class="meta">검사 전 기준 · 검수 전 초안</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${refHTML(v.reference)}</div></details>`;
-  h += `<p class="foot-meta">${(v.submits || []).length > 1 ? `${v.submits.length}번째 채점 (이전 ${v.submits.slice(0, -1).map(x => x.total).join(", ")}점) · ` : ""}모델 ${u.calls || 0}회 · ${((u.in || 0) + (u.out || 0)).toLocaleString()} 토큰</p></div>`;
+  h += `<details class="acc"><summary>${I("menu_book")}모범 답안${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${refHTML(v.reference)}</div></details>`;
+  h += (v.submits || []).length > 1 ? `<p class="foot-meta">이전 채점 ${v.submits.slice(0, -1).map(x => x.total).join(", ")}점</p></div>` : `</div>`;
   body().innerHTML = h;
   $$("#cvBody .dom").forEach(b => b.onclick = () => { const w = b.nextElementSibling, o = w.hidden; w.hidden = !o; b.setAttribute("aria-expanded", o); });
 }
 function domWhy(d, j){
   const sb = (j.sub || {})[d], why = (j.reasons || {})[d];
   const parts = sb ? Object.entries(sb).map(([k, x]) => `${esc(k)} ${esc(x)}`).join(" · ") : d === "의사소통" ? "환자 설문 8항목 평균 × 5" : "";
-  return `${parts ? `<div class="sub">${parts}</div>` : ""}${why ? esc(why) : d === "의사소통" ? "아래 '환자 평가'에서 항목별 점수를 볼 수 있습니다." : ""}`;
+  return `${parts ? `<div class="sub">${parts}</div>` : ""}${why ? esc(why) : ""}`;
 }
 function refHTML(r){
   if (!r) return `<p class="meta">없음</p>`;
@@ -1078,7 +1145,7 @@ function editMeta(v){
     actions:[{label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
       try {
         const r = await api("/api/record/update", {name:v.name, title:$("#mT", el).value, memo:$("#mM", el).value});
-        close(null); toast("저장했습니다"); v.meta = r.meta; await refreshSide();
+        close(null); toast("저장했습니다"); v.meta = r.meta; upsertRow(v);
         if (CV === v) $("#cvSub").textContent = `${caseOf(v.case) ? `환자 ${caseOf(v.case).no} · ` : ""}${v.patient?.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
       } catch(e){ fail(e); }
     }}]});
@@ -1201,15 +1268,23 @@ async function saveCase(){
   } catch(e){ fail(e); }
 }
 
-/* ───── 시작 ───── */
-async function init(){ try { await loadCases(); await refreshSide(); route(); } catch(e){ fail(e); } }
+/* ───── 시작: 로그인 확인·환자·진료 목록을 한 번에, 진료 주소로 들어오면 그 진료도 동시에 ───── */
+function applyBoot(b){
+  CASES = b.cases || []; CFG = {max_turns: b.max_turns, max_min: b.max_min, maxlen: b.maxlen}; HIST = b.history || [];
+  if (PSEL !== "all" && !caseOf(PSEL)) setPatient("all"); else renderSide();
+}
+async function init(){
+  try { const b = await api("/api/boot"); if (!b.ok) { askLogin(); return; } applyBoot(b); route(); } catch(e){ fail(e); }
+}
 (async () => {
-  try {
-    const a = await (await fetch(API + "/api/auth", {headers: TOKEN ? {Authorization:"Bearer " + TOKEN} : {}})).json();
-    $("#pwDays").textContent = a.days || 1;
-    if (!a.ok) { show("home"); askLogin(); return; }
-  } catch(e){ toast("서버에 연결하지 못했습니다", true); return; }
-  init();
+  const m = /^#c\/([^/]+)/.exec(decodeURIComponent(location.hash || ""));
+  const early = m && TOKEN ? fetchConv(m[1]).then(v => CONVC.set(v.name, v)).catch(() => {}) : null;
+  let b;
+  try { b = await api("/api/boot"); } catch(e){ if (!e.auth) toast("서버에 연결하지 못했습니다", true); return; }
+  if (!b.ok) { show("home"); askLogin(); return; }
+  applyBoot(b);
+  if (early) await early;
+  route();
 })();
 </script>
 </body>
