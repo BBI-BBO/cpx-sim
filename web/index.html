@@ -6,7 +6,7 @@
 <title>CPX 가상 환자</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,refresh,remove,report,save,schedule,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,playlist_add,refresh,remove,report,save,schedule,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
 <script src="config.js"></script>
 <script>window.SP_CONFIG = window.SP_CONFIG || {api: ""};  /* GitHub Pages 판: api 에 Supabase 함수 주소 */</script>
 <style>
@@ -237,6 +237,27 @@ body.drawer-hidden .main{margin-left:0}
 .miss-what{font-weight:600}
 .miss-why{color:var(--on2);font-size:15px}
 .miss-fix{margin-top:6px;padding:8px 12px;border-radius:var(--r);background:var(--s1);font-size:15px}
+
+/* 원문 + 하이라이트 (결과 탭) */
+.soap-orig{display:grid;grid-template-columns:34px 1fr;gap:12px 10px;font-size:16px;line-height:1.8;align-items:baseline}
+.soap-orig .txt{white-space:pre-wrap;word-break:break-word;min-width:0}
+.soap-orig .soap-k{margin:0}
+mark.hl{color:inherit;background:transparent;border-radius:2px;padding:1px 0;cursor:help;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+mark.hl.good{background:color-mix(in srgb,var(--ok) 15%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--ok) 75%,transparent)}
+mark.hl.warn{background:color-mix(in srgb,#d69a2d 20%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
+mark.hl.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
+mark.hl:hover,mark.hl.act{filter:saturate(1.6) brightness(.96)}
+.tip-pop{position:fixed;z-index:85;max-width:min(340px,90vw);background:#23262d;color:#eef0f3;border-radius:var(--r);padding:9px 12px;font-size:14px;line-height:1.5;box-shadow:var(--shadow);pointer-events:none;opacity:0;transition:opacity .1s}
+.tip-pop.on{opacity:1}
+.tip-pop b{display:block;margin-bottom:2px}
+.tip-pop .good{color:#8fe0b3} .tip-pop .warn{color:#f6cf7f} .tip-pop .bad{color:#ffb0a8}
+.hl-legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13.5px;color:var(--on2)}
+.hl-legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.hl-legend .good i{background:color-mix(in srgb,var(--ok) 30%,transparent);box-shadow:inset 0 -2px 0 var(--ok)}
+.hl-legend .warn i{background:color-mix(in srgb,#d69a2d 35%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
+.hl-legend .bad i{background:color-mix(in srgb,var(--bad) 30%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
+.orig-box{border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);padding:16px 18px}
+.orig-box .log{padding:0;max-width:none}
 
 /* 결과 탭 */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r2);background:var(--surface)}
@@ -485,6 +506,7 @@ body.drawer-hidden .main{margin-left:0}
 </form></div>
 <div class="busy" id="busy"><div class="busy-card"><div class="spinner"></div><span id="busyMsg"></span></div></div>
 <div id="toasts"></div>
+<div class="tip-pop" id="tipPop"></div>
 
 <script>
 /* ───── 기본 도구 ───── */
@@ -813,23 +835,54 @@ const hRes = (t, a) => { const k = ACTS[a] || ACTS.EXAM; return `<div class="eve
 const hRej = why => `<div class="note-line">${I("block")}<span>${esc(why)}<small>반려 · 턴 차감 없음</small></span></div>`;
 const hInfo = t => `<div class="note-line info">${I("info")}<span>${esc(t)}</span></div>`;
 const hTyping = () => `<div class="row pt typing"><div class="av">${I("person")}</div><div class="bub dots"><i></i><i></i><i></i></div></div>`;
-function hTurnNote(n){ if (!n) return ""; const [ic] = VERD[n.verdict] || VERD.warn; return `<div class="tn ${esc(n.verdict)}">${I(ic, 1)}<span>${esc(n.note || "")}</span></div>`; }
-function renderChat(){
-  const v = CV, p = v.patient || {}, notes = {};
-  for (const n of v.submit?.judge?.turn_notes || []) notes[+n.turn] = n;
-  let h = "";
-  if (v.done) {
-    const cnt = k => (v.submit.judge?.turn_notes || []).filter(n => n.verdict === k).length;
-    h += (v.submit.judge?.turn_notes || []).length
-      ? `<div class="sumbar legend"><b style="color:var(--on)">턴 평가</b><span style="color:var(--ok)">${I("check_circle", 1)}좋음 ${cnt("good")}</span><span style="color:#c58a1d">${I("error", 1)}아쉬움 ${cnt("warn")}</span><span style="color:var(--bad)">${I("cancel", 1)}불필요 ${cnt("bad")}</span></div>`
-      : `<div class="sumbar">${I("info")}다시 채점하면 턴마다 평가가 붙습니다</div>`;
-  }
-  h += hPt(p.opening);
+const vcls = v => v in VERD ? v : "warn";
+const markAttrs = (vd, tag, note) => `class="hl ${vcls(vd)}" data-tip="1" data-v="${esc(vcls(vd))}" data-tag="${esc(tag || "")}" data-note="${esc(note || "")}"`;
+function hDocMarked(t, a, turn, n){
+  const k = ACTS[a] || ACTS.SAY;
+  return `<div class="row doc"><span class="turn">${turn}</span><div class="bub">${a !== "SAY" ? `<span class="bub-act">${I(k.icon)}${k.label}</span>` : ""}<mark ${markAttrs(n.verdict, "", n.note)}>${esc(t)}</mark></div></div>`;
+}
+function soapMarked(text, frags, labelOf){  // SOAP 원문에서 문장 조각을 찾아 색 하이라이트 (원문 모양·줄바꿈 그대로)
+  const orig = String(text || ""); let out = "", pos = 0;
+  (frags || []).forEach((f, i) => {
+    const at = orig.indexOf(f, pos); if (at < 0) return;
+    const x = labelOf(i);
+    out += esc(orig.slice(pos, at)) + (x ? `<mark ${markAttrs(x.verdict, x.tag, x.note)}>${esc(f)}</mark>` : esc(f));
+    pos = at + f.length;
+  });
+  return out + esc(orig.slice(pos));
+}
+/* 하이라이트 위에 마우스를 올리면(휴대폰은 누르면) 피드백 */
+const TIP = () => $("#tipPop");
+let tipEl = null;
+function showTip(m){
+  if (tipEl) tipEl.classList.remove("act");
+  tipEl = m; m.classList.add("act");
+  const vd = m.dataset.v, lab = (VERD[vd] || VERD.warn)[1];
+  TIP().innerHTML = `<b class="${esc(vd)}">${esc(lab)}${m.dataset.tag ? " · " + esc(m.dataset.tag) : ""}</b>${esc(m.dataset.note || "")}`;
+  TIP().classList.add("on");
+  const r = m.getClientRects()[0] || m.getBoundingClientRect(), t = TIP(), w = t.offsetWidth, h = t.offsetHeight;
+  t.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + "px";
+  t.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + "px";
+}
+function hideTip(){ TIP().classList.remove("on"); if (tipEl) tipEl.classList.remove("act"); tipEl = null; }
+document.addEventListener("mouseover", e => { const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); });
+document.addEventListener("mouseout", e => { const m = e.target.closest?.("mark[data-tip]"); if (m && !m.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener("click", e => { const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); else if (tipEl) hideTip(); });
+document.addEventListener("scroll", hideTip, true);
+function convHTML(v, notes){  // 대화 원문. notes 를 주면 의사 발화에 색 하이라이트 + 마우스 올리면 피드백
+  const p = v.patient || {};
+  let h = hPt(p.opening);
   if (p.vitals) h += `<div class="event vit">${I("monitor_heart")}<div><b>활력징후</b>${vitHTML(p.vitals)}</div></div>`;
   for (const e of v.events || []) {
     if (e.type === "reject") { h += hDoc(e.text, e.act, null, true) + hRej(e.why); continue; }
-    h += hDoc(e.text, e.act, e.turn) + hTurnNote(notes[+e.turn]) + (e.act === "SAY" ? hPt(e.out) : hRes(e.out, e.act));
+    const n = notes && notes[+e.turn];
+    h += (n ? hDocMarked(e.text, e.act, e.turn, n) : hDoc(e.text, e.act, e.turn)) + (e.act === "SAY" ? hPt(e.out) : hRes(e.out, e.act));
   }
+  return h;
+}
+function renderChat(){
+  const v = CV;
+  let h = convHTML(v);
   if (PENDING.has(v.name)) h += hTyping();
   if (!v.done && !(v.events || []).length) h += hInfo("환자에게 첫 질문을 해 보세요. SOAP는 'SOAP 기록' 탭에서 씁니다.");
   body().innerHTML = `<div class="log" id="log">${h}</div>`;
@@ -934,28 +987,10 @@ function renderSoap(){
     return;
   }
   $("#cvBody").oninput = null;
-  const split = sub.soap_split, lab = {};
-  for (const x of j.soap_sentences || []) lab[String(x.id || "").toUpperCase()] = x;
-  const cnt = k => (j.soap_sentences || []).filter(x => x.verdict === k).length;
-  let h = `<div class="pane"><div class="page-head" style="margin-bottom:6px"><div class="ph-main">${split && (j.soap_sentences || []).length
-      ? `<div class="legend"><span style="color:var(--ok)">${I("check_circle", 1)}좋음 ${cnt("good")}</span><span style="color:#c58a1d">${I("error", 1)}아쉬움 ${cnt("warn")}</span><span style="color:var(--bad)">${I("cancel", 1)}틀림 ${cnt("bad")}</span></div>`
-      : `<p class="meta">다시 채점하면 문장마다 평가가 붙습니다.</p>`}</div>
-    <div class="ph-act"><button class="btn outline" id="reBtn">${I("refresh")}<span class="t">고쳐서 다시 채점</span></button></div></div>`;
-  for (const k of "SOAP") {
-    const parts = split ? split[k] || [] : [];
-    h += `<div class="sx"><span class="soap-k">${k}</span><div class="sx-list">`;
-    if (split && parts.length) h += parts.map((t, i) => {
-      const x = lab[`${k}${i + 1}`], vd = x?.verdict in VERD ? x.verdict : "none", [ic] = VERD[vd] || ["remove"];
-      return `<div class="sn ${vd}">${I(ic, 1)}<div><div class="sn-t">${esc(t)}</div>${x ? `<div class="sn-n">${x.tag ? `<b>${esc(x.tag)}</b> · ` : ""}${esc(x.note || "")}</div>` : ""}</div></div>`;
-    }).join("");
-    else h += `<div class="sn none"><div class="sn-t" style="white-space:pre-wrap">${esc((sub.soap || {})[k]) || '<span class="meta">비어 있음</span>'}</div></div>`;
-    h += `</div></div>`;
-  }
-  const acc = j.accuracy ?? 0, [vc, vi, vt] = acc >= 90 ? ["g","check_circle","정답"] : acc >= 40 ? ["y","error","부분 정답"] : ["r","cancel","오답"];
-  h += `<div class="sx"><span class="soap-k">Dx</span><div class="sx-list"><div class="sn ${vc === "g" ? "good" : vc === "y" ? "warn" : "bad"}">${I(vi, 1)}<div><div class="sn-t">${esc(sub.dx)}</div><div class="sn-n"><b>${vt}</b> · 정답 ${esc(sub.truth)}</div></div></div></div></div>`;
-  const miss = [...(j.soap_top || []), ...(j.soap_more || [])];
-  if (miss.length) h += `<div class="sec-h"><h3>빠진 것·고칠 점</h3><span class="meta">${miss.length}개</span></div><div>${miss.map(missItem).join("")}</div>`;
-  h += `</div>`;
+  let h = `<div class="pane"><div class="page-head" style="margin-bottom:10px"><div class="ph-main"><p class="meta">제출한 기록 그대로입니다. 문장별 피드백은 결과 탭에서 봅니다.</p></div>
+    <div class="ph-act"><button class="btn outline" id="reBtn">${I("refresh")}<span class="t">고쳐서 다시 채점</span></button></div></div>
+    <div class="orig-box"><div class="soap-orig">${[..."SOAP"].map(k => `<span class="soap-k">${k}</span><div class="txt">${esc((sub.soap || {})[k]) || '<span class="meta">비어 있음</span>'}</div>`).join("")}
+      <span class="soap-k">Dx</span><div class="txt"><b>${esc(sub.dx)}</b></div></div></div></div>`;
   body().innerHTML = h;
   $("#reBtn").onclick = () => { soapEdit = true; renderSoap(); };
 }
@@ -989,7 +1024,21 @@ function renderResult(){
     <div class="domains">${DOMAINS.map(([d, mx]) => { const x = sc[d] ?? 0, r = x / mx;
       return `<button class="dom" aria-expanded="false"><span class="dn">${d}</span><span class="bar"><i class="${r >= .7 ? "g" : r >= .4 ? "y" : "r"}" style="width:${Math.round(100 * r)}%"></i></span><span class="ds">${x}<small> / ${mx}</small></span>${I("expand_more")}</button><div class="dom-why" hidden>${domWhy(d, j)}</div>`; }).join("")}</div>`;
   const missed = (j.red_flags || []).filter(x => !x.checked);
+  const legend = (arr) => { const c = k => arr.filter(x => vcls(x.verdict) === k).length;
+    return `<div class="hl-legend"><span class="good"><i></i>좋음 ${c("good")}</span><span class="warn"><i></i>아쉬움 ${c("warn")}</span><span class="bad"><i></i>틀림 ${c("bad")}</span><span>· ${isMobile() ? "누르면" : "마우스를 올리면"} 피드백</span></div>`; };
+  const sents = j.soap_sentences || [], lab = {};
+  for (const x of sents) lab[String(x.id || "").toUpperCase()] = x;
+  const split = sub.soap_split;
+  const soapBody = [..."SOAP"].map(k => `<span class="soap-k">${k}</span><div class="txt">${split && sents.length ? soapMarked((sub.soap || {})[k], split[k], i => lab[`${k}${i + 1}`]) : esc((sub.soap || {})[k])}${(sub.soap || {})[k] ? "" : '<span class="meta">비어 있음</span>'}</div>`).join("")
+    + `<span class="soap-k">Dx</span><div class="txt"><mark ${markAttrs(acc >= 90 ? "good" : acc >= 40 ? "warn" : "bad", vt.replace("주진단 ", ""), "정답 " + (sub.truth || "") + (j.accuracy_note ? " · " + j.accuracy_note : ""))}><b>${esc(sub.dx)}</b></mark></div>`;
   if (missed.length) h += `<div class="callout">${I("report", 1)}<div><b>놓치면 위험한 것 ${missed.length}개를 확인하지 않았습니다</b><ul>${missed.map(x => `<li>${esc(x.item)}</li>`).join("")}</ul></div></div>`;
+  const miss = [...(j.soap_top || []), ...(j.soap_more || [])];
+  h += `<div class="sec-h"><h3>SOAP 기록</h3>${split && sents.length ? legend(sents) : `<span class="meta">다시 채점하면 문장별 하이라이트가 붙습니다</span>`}</div>
+    <div class="orig-box"><div class="soap-orig">${soapBody}</div></div>
+    ${miss.length ? `<details class="acc"><summary>${I("playlist_add")}빠진 것·고칠 점<span class="meta">${miss.length}개</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${miss.map(missItem).join("")}</div></details>` : ""}`;
+  const tnotes = {}; for (const n of j.turn_notes || []) tnotes[+n.turn] = n;
+  h += `<div class="sec-h"><h3>대화</h3>${(j.turn_notes || []).length ? legend(j.turn_notes) : `<span class="meta">다시 채점하면 턴별 하이라이트가 붙습니다</span>`}</div>
+    <div class="orig-box"><div class="log">${convHTML(v, tnotes)}</div></div>`;
   const ck = [...(j.checklist || [])], order = {"지어낸 기록":0, "미수집":1, "기록 누락":2, "정상":3};
   ck.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
   const tc = t => t === "정상" ? "g" : t === "지어낸 기록" ? "r" : "y";
