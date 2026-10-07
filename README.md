@@ -61,12 +61,12 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 | act | 뜻 | 규칙 |
 |---|---|---|
 | `SAY` | 질문·설명·공감 | 30자 이하, 한 번에 하나만 묻기. 인사·공감 뒤에 질문 하나는 괜찮음 |
-| `EXAM` | 진찰 동작 하나 | 진찰 목록은 주지 않음. 묶으면 반려. 기록에 없는 진찰은 "특이 소견 없음" |
+| `EXAM` | 진찰 동작 하나 | 진찰 목록은 대회 규칙상 일부러 주지 않음. 묶으면 반려. 증례에 기록이 없는 진찰은 "특이 소견 없음" |
 | `TEST` | 검사 하나 | 본선만 |
 
 `ok: false` 는 반려(규칙 위반)나 불가(예선의 TEST, 턴 소진)이며 턴은 줄지 않습니다. `out` 에 이유가 있습니다.
 
-**⑤ SOAP 제출** `POST /api/submit` — 진료가 끝나고 채점합니다 (30초~1분).
+**⑤ SOAP 제출** `POST /api/submit` — 진료가 끝나고 채점합니다. 1~2분 걸리니 요청 시간 제한을 넉넉히 (예: `curl --max-time 180`).
 ```json
 요청 {"name": "20261007_152919_A",
       "soap": {"S": "20세 여성, 6일 전부터 배 전체 통증, 구토 반복, 발열 부인",
@@ -80,7 +80,7 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
                  "judge": {"accuracy": 100, "soap_sentences": […], "turn_notes": […], "checklist": […], "red_flags": […], "soap_top": […]},
                  "patient": {"good": […], "regret": […], "ppi": {…}}}}
 ```
-SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다. 결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
+SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다. `dx` 는 병명 하나 (코드는 붙이지 않아도 됨). 결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
 
 **그 밖**
 | 요청 | 쓰임 |
@@ -97,7 +97,7 @@ TOK=$(curl -s -X POST $API/api/login -H 'Content-Type: application/json' -d "{\"
 H=(-H "Authorization: Bearer $TOK" -H 'Content-Type: application/json')
 curl -s -X POST $API/api/start "${H[@]}" -d '{"cid":"A","mode":"예선"}'
 curl -s -X POST $API/api/act "${H[@]}" -d '{"name":"<start 가 준 name>","act":"SAY","text":"어디가 불편하세요?"}'
-curl -s -X POST $API/api/submit "${H[@]}" -d '{"name":"<name>","soap":{"S":"…","O":"…","A":"…","P":"…"},"dx":"주진단"}'
+curl -s --max-time 180 -X POST $API/api/submit "${H[@]}" -d '{"name":"<name>","soap":{"S":"…","O":"…","A":"…","P":"…"},"dx":"주진단"}'
 ```
 
 ### 예제: AI 의사 스크립트
