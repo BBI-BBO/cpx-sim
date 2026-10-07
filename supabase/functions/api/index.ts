@@ -1,7 +1,7 @@
 // CPX 가상 환자 API — Supabase Edge Function (Deno). 로컬 판 tools/sp_web.py · tools/sp_sim.py 를 옮긴 것.
 // 경로·응답 모양은 로컬 판과 같아서 화면(web/index.html)은 두 판에서 그대로 쓴다.
 // 함수 비밀값: SP_OPENAI_API_KEY, SP_WEB_PASSWORD (GitHub Secrets → 배포 워크플로가 넣음)
-// 자동으로 주어지는 값: SUPABASE_DB_URL (DB 직접 연결, 빠름), SUPABASE_URL·서비스 키 (연결이 안 되면 REST 로). 표마다 RLS 를 켜 두어 공개 키로는 못 읽음
+// 자동으로 주어지는 값: SUPABASE_URL·서비스 키 (REST), SUPABASE_DB_URL (SP_DB_DIRECT=1 일 때만). 표마다 RLS 를 켜 두어 공개 키로는 못 읽음
 import * as P from "./prompts.ts";
 import postgres from "npm:postgres@3.4.5";
 
@@ -50,8 +50,9 @@ const fmt = (t: string, v: Record<string, unknown>) =>
 const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const GREET = new RegExp(P.GREET);
 
-// ───────────── DB: 직접 연결(postgres.js) 이 기본, 연결이 안 되면 REST(PostgREST) ─────────────
-const DB_URL = env("SUPABASE_DB_URL");
+// ───────────── DB: REST(PostgREST) 가 기본. SP_DB_DIRECT=1 이면 직접 연결(postgres.js) ─────────────
+// 실측(10/07): 이 환경에서는 요청마다 직접 연결을 새로 맺어 호출당 약 1초 → REST(0.3~0.5초)가 더 빠름
+const DB_URL = env("SP_DB_DIRECT") === "1" ? env("SUPABASE_DB_URL") : "";
 const sql: any = DB_URL ? postgres(DB_URL, { max: 4, prepare: false, idle_timeout: 30, connect_timeout: 8, onnotice: () => {} }) : null;
 let useSql = !!sql;
 const JSONB = new Set(["start", "events", "draft", "submits", "meta", "usage", "scores", "data"]);
