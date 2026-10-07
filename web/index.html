@@ -242,13 +242,13 @@ body.drawer-hidden .main{margin-left:0}
 .soap-orig{display:grid;grid-template-columns:34px 1fr;gap:12px 10px;font-size:16px;line-height:1.8;align-items:baseline}
 .soap-orig .txt{white-space:pre-wrap;word-break:break-word;min-width:0}
 .soap-orig .soap-k{margin:0}
-mark.hl{color:inherit;background:transparent;border-radius:2px;padding:1px 0;cursor:help;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+mark.hl{color:inherit;background:transparent;border-radius:2px;padding:0;cursor:help;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.good{background:color-mix(in srgb,var(--ok) 15%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--ok) 75%,transparent)}
 mark.hl.warn{background:color-mix(in srgb,#d69a2d 20%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
 mark.hl.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
-mark.hl.good:hover,mark.hl.good.act{background:color-mix(in srgb,var(--ok) 30%,transparent)}
-mark.hl.warn:hover,mark.hl.warn.act{background:color-mix(in srgb,#d69a2d 38%,transparent)}
-mark.hl.bad:hover,mark.hl.bad.act{background:color-mix(in srgb,var(--bad) 30%,transparent)}
+mark.hl.good:hover,mark.hl.good.hl-on{background:color-mix(in srgb,var(--ok) 30%,transparent)}
+mark.hl.warn:hover,mark.hl.warn.hl-on{background:color-mix(in srgb,#d69a2d 38%,transparent)}
+mark.hl.bad:hover,mark.hl.bad.hl-on{background:color-mix(in srgb,var(--bad) 30%,transparent)}
 .tip-pop{position:fixed;z-index:85;max-width:min(340px,90vw);background:#23262d;color:#eef0f3;border-radius:var(--r);padding:9px 12px;font-size:14px;line-height:1.5;box-shadow:var(--shadow);pointer-events:none;opacity:0;transition:opacity .1s}
 .tip-pop.on{opacity:1}
 .tip-pop b{display:block;margin-bottom:2px}
@@ -260,7 +260,7 @@ mark.hl.bad:hover,mark.hl.bad.act{background:color-mix(in srgb,var(--bad) 30%,tr
 .hl-legend .bad i{background:color-mix(in srgb,var(--bad) 30%,transparent);box-shadow:inset 0 -2px 0 var(--bad)}
 .orig-box{border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);padding:16px 18px}
 .orig-box .log{padding:0;max-width:none}
-.res-box{max-height:min(55vh,500px);overflow-y:auto;overscroll-behavior:contain}
+.res-box{max-height:min(55vh,500px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}  /* 스크롤바가 생겼다 없어지며 글줄이 흔들리지 않게 */
 .fb-sheet{position:fixed;left:0;right:0;bottom:0;z-index:86;background:#23262d;color:#eef0f3;border-radius:var(--r3) var(--r3) 0 0;padding:14px 12px calc(16px + env(safe-area-inset-bottom)) 18px;box-shadow:var(--shadow);transform:translateY(105%);transition:transform .18s ease}
 .fb-sheet.on{transform:none}
 .fb-sheet-in{display:flex;gap:8px;align-items:flex-start}
@@ -304,7 +304,7 @@ mark.hl.bad:hover,mark.hl.bad.act{background:color-mix(in srgb,var(--bad) 30%,tr
 .acc>summary .ms{color:var(--on3);transition:transform .15s}
 .acc[open]>summary .ms.chev{transform:rotate(180deg)}
 .acc>summary .meta{font-weight:400;margin-left:auto}
-.acc-b{padding:0 16px 14px;max-height:min(50vh,440px);overflow-y:auto;overscroll-behavior:contain}
+.acc-b{padding:0 16px 14px;max-height:min(50vh,440px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .ck{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
 .ck:last-child{border-bottom:0}
 .ck-main{flex:1;min-width:0}
@@ -911,27 +911,27 @@ function soapMarked(text, frags, labelOf){  // SOAP 원문에서 문장 조각�
 const TIP = () => $("#tipPop");
 let tipEl = null;
 function showTip(m){
-  if (tipEl) tipEl.classList.remove("act");
-  tipEl = m; m.classList.add("act");
+  if (tipEl) tipEl.classList.remove("hl-on");
+  tipEl = m; m.classList.add("hl-on");
   TIP().innerHTML = tipHTML(m) + esc(m.dataset.note || "");
   TIP().classList.add("on");
   const r = m.getClientRects()[0] || m.getBoundingClientRect(), t = TIP(), w = t.offsetWidth, h = t.offsetHeight;
   t.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + "px";
   t.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + "px";
 }
-function hideTip(){ TIP().classList.remove("on"); if (tipEl) tipEl.classList.remove("act"); tipEl = null; }
+function hideTip(){ TIP().classList.remove("on"); if (tipEl) tipEl.classList.remove("hl-on"); tipEl = null; }
 let lastPtr = matchMedia("(hover: hover)").matches ? "mouse" : "touch";
 document.addEventListener("pointerdown", e => { lastPtr = e.pointerType || "mouse"; }, true);
 const canHover = () => lastPtr === "mouse";
 function tipHTML(m){ const vd = m.dataset.v, lab = (VERD[vd] || VERD.warn)[1]; return `<b class="${esc(vd)}">${esc(lab)}${m.dataset.tag ? " · " + esc(m.dataset.tag) : ""}</b>`; }
 function showSheet(m){  // 휴대폰: 누른 하이라이트의 피드백을 화면 아래에
-  if (tipEl) tipEl.classList.remove("act");
-  tipEl = m; m.classList.add("act");
+  if (tipEl) tipEl.classList.remove("hl-on");
+  tipEl = m; m.classList.add("hl-on");
   const said = m.textContent.trim();
   $("#fbSheetBody").innerHTML = tipHTML(m) + `<q>${esc(said.length > 60 ? said.slice(0, 60) + "…" : said)}</q>${esc(m.dataset.note || "")}`;
   $("#fbSheet").classList.add("on");
 }
-function hideSheet(){ $("#fbSheet").classList.remove("on"); if (tipEl) tipEl.classList.remove("act"); tipEl = null; }
+function hideSheet(){ $("#fbSheet").classList.remove("on"); if (tipEl) tipEl.classList.remove("hl-on"); tipEl = null; }
 $("#fbSheetX").onclick = hideSheet;
 document.addEventListener("pointerover", e => { if (e.pointerType !== "mouse") return; lastPtr = "mouse"; const m = e.target.closest?.("mark[data-tip]"); if (m) showTip(m); });
 document.addEventListener("pointerout", e => { if (e.pointerType !== "mouse") return; const m = e.target.closest?.("mark[data-tip]"); if (m && !m.contains(e.relatedTarget)) hideTip(); });
