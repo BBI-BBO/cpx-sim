@@ -1,0 +1,1167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CPX 가상 환자</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,refresh,remove,report,save,schedule,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
+<script src="config.js"></script>
+<script>window.SP_CONFIG = window.SP_CONFIG || {api: ""};  /* GitHub Pages 판: api 에 Supabase 함수 주소 */</script>
+<style>
+:root{
+  --bg:#f8f9fb; --surface:#fff; --s1:#f3f5f8; --s2:#eceff4; --s3:#e1e5ec;
+  --on:#1b1d22; --on2:#505668; --on3:#7b8193;
+  --line:#e3e6ec; --line2:#cfd4dd;
+  --pri:#3456c6; --on-pri:#fff; --pri-c:#e3e9ff; --on-pri-c:#17307a;
+  --ok:#1d7a4e; --ok-c:#dcf3e6; --warn:#8a5600; --warn-c:#fdecc8; --bad:#b42318; --bad-c:#fde8e6;
+  --exam-c:#e4f4ec; --on-exam-c:#155c3b; --test-c:#fff0dc; --on-test-c:#7a4700;
+  --scrim:rgba(15,18,25,.42); --shadow:0 8px 28px rgba(16,24,40,.16),0 2px 6px rgba(16,24,40,.06);
+  --r:6px; --r2:8px; --r3:12px;
+  --appbar:60px; --drawer:296px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#111318; --surface:#181b21; --s1:#1d2128; --s2:#242932; --s3:#2d333e;
+  --on:#e6e8ee; --on2:#adb4c3; --on3:#818899;
+  --line:#2a2f38; --line2:#3b414d;
+  --pri:#aabcff; --on-pri:#0e2160; --pri-c:#2b3f86; --on-pri-c:#e0e6ff;
+  --ok:#83d9ab; --ok-c:#173b2a; --warn:#f3c370; --warn-c:#3d2e12; --bad:#ffb4ab; --bad-c:#4a1e1b;
+  --exam-c:#173b2a; --on-exam-c:#a8e8c5; --test-c:#3d2e12; --on-test-c:#f8d394;
+  --scrim:rgba(0,0,0,.6); --shadow:0 8px 28px rgba(0,0,0,.5); }}
+:root[data-theme="dark"]{
+  --bg:#111318; --surface:#181b21; --s1:#1d2128; --s2:#242932; --s3:#2d333e;
+  --on:#e6e8ee; --on2:#adb4c3; --on3:#818899;
+  --line:#2a2f38; --line2:#3b414d;
+  --pri:#aabcff; --on-pri:#0e2160; --pri-c:#2b3f86; --on-pri-c:#e0e6ff;
+  --ok:#83d9ab; --ok-c:#173b2a; --warn:#f3c370; --warn-c:#3d2e12; --bad:#ffb4ab; --bad-c:#4a1e1b;
+  --exam-c:#173b2a; --on-exam-c:#a8e8c5; --test-c:#3d2e12; --on-test-c:#f8d394;
+  --scrim:rgba(0,0,0,.6); --shadow:0 8px 28px rgba(0,0,0,.5); }
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--on);font:16px/1.6 "Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;letter-spacing:-.003em;-webkit-font-smoothing:antialiased}
+body[data-view="conv"]{overflow:hidden}
+h1{font-size:23px;line-height:1.3;font-weight:700;margin:0;letter-spacing:-.01em}
+h2{font-size:18px;line-height:1.4;font-weight:700;margin:0}
+h3{font-size:16px;font-weight:700;margin:0 0 10px}
+p{margin:0}
+a{color:inherit}
+button{font:inherit;color:inherit}
+.meta{font-size:14px;color:var(--on2)}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;font-feature-settings:"liga";-webkit-font-smoothing:antialiased;font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24;user-select:none;flex:none;overflow:hidden;width:1em}
+.ms.f{font-variation-settings:"FILL" 1,"wght" 400,"GRAD" 0,"opsz" 24}
+[hidden]{display:none!important}
+
+/* ── 버튼·칩·입력 ── */
+.btn{height:38px;padding:0 16px;border-radius:var(--r);border:0;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;flex:none;transition:background .15s,filter .15s}
+.btn .ms{font-size:20px;margin-left:-3px}
+.btn.filled{background:var(--pri);color:var(--on-pri)}
+.btn.filled:hover{filter:brightness(1.07)}
+.btn.tonal{background:var(--pri-c);color:var(--on-pri-c)}
+.btn.tonal:hover{filter:brightness(.97)}
+.btn.outline{background:transparent;border:1px solid var(--line2);color:var(--on)}
+.btn.text{background:transparent;color:var(--pri);padding:0 10px}
+.btn.outline:hover,.btn.text:hover{background:color-mix(in srgb,var(--pri) 8%,transparent)}
+.btn.danger{background:var(--bad);color:#fff}
+.btn.block{width:100%;height:46px;font-size:16px}
+.btn:disabled{opacity:.38;cursor:default;filter:none}
+.iconbtn{width:38px;height:38px;border-radius:var(--r);border:0;background:transparent;color:var(--on2);display:inline-grid;place-items:center;cursor:pointer;flex:none;transition:background .15s}
+.iconbtn:hover{background:var(--s2)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:4px;background:var(--s2);color:var(--on2);font-size:14px;font-weight:500;white-space:nowrap}
+.chip .ms{font-size:18px}
+.chip.sm{height:22px;padding:0 7px;font-size:12.5px}
+.chip.g{background:var(--ok-c);color:var(--ok)} .chip.y{background:var(--warn-c);color:var(--warn)} .chip.r{background:var(--bad-c);color:var(--bad)} .chip.p{background:var(--pri-c);color:var(--on-pri-c)}
+.inp{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--on);font:inherit;font-size:16px;line-height:1.55}
+.inp:focus{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 16%,transparent)}
+textarea.inp{resize:vertical;min-height:76px}
+select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--on2) 50%),linear-gradient(135deg,var(--on2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
+.fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.fld label{font-size:14px;font-weight:600;color:var(--on2)}
+.fld .hint{font-weight:400;color:var(--on3)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;height:38px;flex:none}
+.seg button{border:0;background:transparent;padding:0 16px;font-size:15px;font-weight:500;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:var(--pri-c);color:var(--on-pri-c);font-weight:600}
+.search{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:var(--r);background:var(--s2);color:var(--on3)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--on);font:inherit;font-size:15px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2)}
+.pad{padding:18px 20px}
+
+/* ── 상단바 ── */
+.appbar{position:fixed;top:0;left:0;right:0;height:var(--appbar);display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--bg);border-bottom:1px solid var(--line);z-index:30}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;text-decoration:none;padding:0 6px;white-space:nowrap}
+.brand .ms{color:var(--pri);font-size:25px}
+.ctx{display:none;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.spacer{flex:1}
+
+/* ── 사이드바 ── */
+.drawer{position:fixed;top:var(--appbar);bottom:0;left:0;width:var(--drawer);background:var(--bg);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:20;transition:transform .2s ease}
+body.drawer-hidden .drawer{transform:translateX(-100%)}
+.drawer-mhead{display:none}
+.drawer-top{padding:12px 10px 4px;display:flex;flex-direction:column;gap:8px}
+.psel{display:flex;align-items:center;gap:12px;width:100%;padding:10px 10px 10px 12px;border:1px solid var(--line2);border-radius:var(--r2);background:var(--surface);cursor:pointer;text-align:left}
+.psel:hover{background:var(--s1)}
+.psel-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.psel-t{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psel-m{font-size:13.5px;color:var(--on2)}
+.psel>.ms{color:var(--on3)}
+.num{width:34px;height:34px;border-radius:var(--r);background:var(--s2);color:var(--on2);display:grid;place-items:center;font-weight:700;flex:none;font-size:15px}
+.num.pri{background:var(--pri);color:var(--on-pri)}
+.newbtn{width:100%;height:42px;justify-content:flex-start;padding:0 14px}
+.drawer-list{flex:1;overflow-y:auto;padding:0 8px 10px}
+.grp{font-size:13px;font-weight:600;color:var(--on3);padding:14px 10px 4px}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r);text-decoration:none;cursor:pointer;border:0;background:transparent;width:100%;text-align:left}
+.ni:hover{background:var(--s2)}
+.ni.on{background:var(--pri-c);color:var(--on-pri-c)}
+.ni-main{flex:1;min-width:0}
+.ni-t{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ni-m{font-size:13px;color:var(--on3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ni.on .ni-m{color:inherit;opacity:.75}
+.ni>.ms{color:var(--on2)}
+.score-badge{font-size:15px;font-weight:700;min-width:26px;text-align:right}
+.score-badge.g{color:var(--ok)} .score-badge.y{color:var(--warn)} .score-badge.r{color:var(--bad)}
+.live-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ok);white-space:nowrap}
+.live-badge i{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.side-empty{padding:26px 14px;text-align:center;color:var(--on3);font-size:14px}
+.drawer-foot{border-top:1px solid var(--line);padding:8px}
+.drawer-scrim{display:none;position:fixed;inset:0;background:var(--scrim);z-index:35}
+
+/* ── 본문 ── */
+.main{margin-left:var(--drawer);padding-top:var(--appbar);min-height:100dvh;transition:margin .2s ease}
+body.drawer-hidden .main{margin-left:0}
+.content{max-width:960px;margin:0 auto;padding:30px 30px 72px}
+.page-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.ph-main{flex:1;min-width:220px}
+.ph-main .meta{margin-top:4px}
+.ph-act{display:flex;align-items:center;gap:8px}
+.empty{min-height:calc(100dvh - var(--appbar) - 100px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px}
+.hero{width:68px;height:68px;border-radius:var(--r3);background:var(--pri-c);color:var(--on-pri-c);display:grid;place-items:center}
+.hero .ms{font-size:36px}
+.empty p{color:var(--on2);max-width:440px;font-size:16px}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+
+/* ── 진료 화면: 머리 + 탭 + 본문 + 입력 ── */
+.conv{height:calc(100dvh - var(--appbar));display:flex;flex-direction:column}
+.conv-head{border-bottom:1px solid var(--line);background:var(--bg)}
+.ch-in{max-width:880px;margin:0 auto;padding:10px 20px 0}
+.ch-row{display:flex;align-items:center;gap:10px}
+.pt-info{min-width:0;flex:1}
+.pt-name{font-size:17px;font-weight:700;line-height:1.3}
+.pt-sub{font-size:14px;color:var(--on2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-chips{display:flex;gap:6px}
+.chip.warn{background:var(--bad-c);color:var(--bad)}
+.ctabs{display:flex;gap:2px;margin-top:6px}
+.ctab{height:42px;padding:0 14px;border:0;background:transparent;color:var(--on2);font-size:15.5px;font-weight:600;cursor:pointer;position:relative;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.ctab .ms{font-size:19px}
+.ctab:hover{color:var(--on)}
+.ctab.on{color:var(--pri)}
+.ctab.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--pri)}
+.ctab .dot{width:6px;height:6px;border-radius:50%;background:var(--pri)}
+.cbody{flex:1;overflow-y:auto}
+.pane{max-width:880px;margin:0 auto;padding:22px 20px 48px}
+.log{max-width:880px;margin:0 auto;padding:22px 20px 16px;display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;align-items:flex-end}
+.row.doc{justify-content:flex-end}
+.av{width:32px;height:32px;border-radius:var(--r);background:var(--s2);color:var(--on2);display:grid;place-items:center;flex:none}
+.av .ms{font-size:19px}
+.bub{max-width:min(580px,82%);padding:10px 14px;border-radius:10px;font-size:16px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.row.pt .bub{background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:2px}
+.row.doc .bub{background:var(--pri-c);color:var(--on-pri-c);border-bottom-right-radius:2px}
+.row.doc.rej .bub{background:transparent;border:1px dashed var(--line2);color:var(--on3);text-decoration:line-through}
+.bub-act{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;opacity:.8;margin-bottom:2px}
+.bub-act .ms{font-size:16px}
+.turn{font-size:12px;color:var(--on3);min-width:18px;text-align:center;margin-bottom:4px}
+.tn{align-self:flex-end;display:flex;gap:6px;align-items:flex-start;max-width:min(580px,82%);margin:-6px 0 2px;font-size:14px;line-height:1.45;text-align:left}
+.tn .ms{font-size:17px;margin-top:1px}
+.tn.good{color:var(--ok)} .tn.warn{color:var(--warn)} .tn.bad{color:var(--bad)}
+.tn span:last-child{color:var(--on2)}
+.event{align-self:center;display:flex;gap:12px;align-items:flex-start;width:min(620px,100%);padding:11px 15px;border-radius:var(--r2);font-size:15.5px}
+.event>.ms{margin-top:1px}
+.event b{display:block;font-weight:700}
+.event.exam{background:var(--exam-c);color:var(--on-exam-c)}
+.event.test{background:var(--test-c);color:var(--on-test-c)}
+.event.vit{background:var(--s1);border:1px solid var(--line)}
+.event.vit>.ms{color:var(--bad)}
+.vit-grid{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:4px}
+.vit-grid span{display:flex;flex-direction:column;font-size:15px}
+.vit-grid small{font-size:12.5px;color:var(--on3)}
+.note-line{align-self:center;display:flex;gap:6px;align-items:center;font-size:14px;color:var(--bad);text-align:center}
+.note-line .ms{font-size:18px}
+.note-line small{color:var(--on3);font-size:13px;margin-left:4px}
+.note-line.info{color:var(--on2)}
+.sumbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--on2);padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.dots{display:flex;gap:5px;padding:15px}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--on3);animation:blink 1.2s infinite both}
+.dots i:nth-child(2){animation-delay:.2s} .dots i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.composer{border-top:1px solid var(--line);background:var(--bg);padding-bottom:env(safe-area-inset-bottom)}
+.composer-in{max-width:880px;margin:0 auto;padding:10px 20px 14px}
+.acts{display:flex;gap:6px;margin-bottom:8px}
+.act{height:32px;padding:0 12px;border-radius:var(--r);border:1px solid var(--line2);background:transparent;color:var(--on2);display:inline-flex;gap:6px;align-items:center;font-size:14.5px;cursor:pointer}
+.act .ms{font-size:18px}
+.act.on{background:var(--pri-c);border-color:transparent;color:var(--on-pri-c);font-weight:600}
+.act:disabled{opacity:.4;cursor:default}
+.inbox{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line2);border-radius:var(--r2);padding:5px 5px 5px 14px}
+.inbox:focus-within{border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 14%,transparent)}
+.inbox input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--on);font:inherit;font-size:16px;height:38px}
+.count{font-size:13px;color:var(--on3);white-space:nowrap}
+.count.over{color:var(--bad);font-weight:700}
+.send{width:38px;height:38px;border-radius:var(--r);border:0;background:var(--pri);color:var(--on-pri);display:grid;place-items:center;cursor:pointer;flex:none}
+.send:disabled{background:var(--s3);color:var(--on3);cursor:default}
+
+/* SOAP 기록 탭 */
+.lead{color:var(--on2);font-size:15px;margin-bottom:18px}
+.soap-k{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r);background:var(--pri-c);color:var(--on-pri-c);font-weight:800;font-size:14px;margin-right:8px}
+.soap-f label{display:flex;align-items:center;font-size:15px;color:var(--on)}
+.soap-foot{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}
+.legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--on2)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend .ms{font-size:18px}
+.sx{display:grid;grid-template-columns:40px 1fr;gap:4px 8px;padding:14px 0;border-bottom:1px solid var(--line)}
+.sx:last-of-type{border-bottom:0}
+.sx-list{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sn{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:var(--r)}
+.sn .ms{font-size:19px;margin-top:2px}
+.sn.good .ms{color:var(--ok)} .sn.warn .ms{color:#c58a1d} .sn.bad .ms{color:var(--bad)} .sn.none .ms{color:var(--on3)}
+.sn.bad{background:color-mix(in srgb,var(--bad-c) 55%,transparent)}
+.sn.warn{background:color-mix(in srgb,var(--warn-c) 45%,transparent)}
+.sn-t{font-size:16px;line-height:1.5}
+.sn-n{font-size:14px;color:var(--on2);margin-top:1px}
+.sn-n b{font-weight:600}
+.sec-h{display:flex;align-items:center;gap:8px;margin:28px 0 8px}
+.sec-h h3{margin:0;flex:1}
+.miss{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.miss:last-child{border-bottom:0}
+.miss>.ms{font-size:20px;margin-top:2px}
+.miss .r{color:var(--bad)} .miss .y{color:#c58a1d} .miss .n{color:var(--on3)}
+.miss-what{font-weight:600}
+.miss-why{color:var(--on2);font-size:15px}
+.miss-fix{margin-top:6px;padding:8px 12px;border-radius:var(--r);background:var(--s1);font-size:15px}
+
+/* 결과 탭 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r2);background:var(--surface)}
+.stat{padding:16px 18px;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0}
+.stat .k{font-size:13.5px;color:var(--on2)}
+.stat .v{font-size:26px;font-weight:800;line-height:1.25;letter-spacing:-.01em}
+.stat .v small{font-size:15px;color:var(--on3);font-weight:600;margin-left:2px}
+.dxrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 6px;font-size:16px}
+.dxrow .lbl{color:var(--on3);font-size:14px;margin-right:4px}
+.domains{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);padding:4px}
+.dom{display:grid;grid-template-columns:80px 1fr 60px 22px;align-items:center;gap:12px;padding:10px 12px;border:0;background:transparent;border-radius:var(--r);cursor:pointer;text-align:left;width:100%}
+.dom:hover{background:var(--s1)}
+.dom .dn{font-weight:600;font-size:15px}
+.dom .bar{height:8px;border-radius:2px;background:var(--s2);overflow:hidden}
+.dom .bar i{display:block;height:100%}
+.dom .bar i.g{background:var(--ok)} .dom .bar i.y{background:#d69a2d} .dom .bar i.r{background:var(--bad)}
+.dom .ds{font-weight:700;text-align:right;font-size:15.5px}
+.dom .ds small{color:var(--on3);font-weight:500;font-size:13px}
+.dom .ms{color:var(--on3);transition:transform .15s}
+.dom[aria-expanded="true"] .ms{transform:rotate(180deg)}
+.dom-why{padding:0 12px 12px 104px;font-size:15px;color:var(--on2)}
+.dom-why .sub{font-size:13.5px;color:var(--on3);margin-bottom:2px}
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--r2);background:var(--bad-c);color:var(--bad);margin-top:18px}
+.callout ul{margin:6px 0 0;padding-left:18px;color:var(--on)}
+.callout li{margin:3px 0}
+.acc{border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);margin-top:12px}
+.acc>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;font-weight:600}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary .ms{color:var(--on3);transition:transform .15s}
+.acc[open]>summary .ms.chev{transform:rotate(180deg)}
+.acc>summary .meta{font-weight:400;margin-left:auto}
+.acc-b{padding:0 16px 14px}
+.ck{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+.ck:last-child{border-bottom:0}
+.ck-main{flex:1;min-width:0}
+.ck-t{font-size:15.5px}
+.ck-m{display:flex;gap:14px;font-size:13.5px;color:var(--on3);margin-top:1px}
+.ck-m span{display:inline-flex;align-items:center;gap:3px}
+.ck-m .ms{font-size:16px}
+.ck-m .yes{color:var(--ok)} .ck-m .no{color:var(--bad)}
+.lst{list-style:none;margin:0;padding:0}
+.lst li{display:flex;gap:10px;padding:7px 0;font-size:15.5px}
+.lst li .ms{font-size:19px;margin-top:2px}
+.lst .g{color:var(--ok)} .lst .r{color:var(--bad)}
+.ppi{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;margin-top:10px}
+.meter{display:inline-flex;gap:3px}
+.meter i{width:24px;height:7px;border-radius:2px;background:var(--s3)}
+.meter i.on{background:var(--pri)}
+.quote{padding:12px 14px;border-left:3px solid var(--line2);background:var(--s1);font-size:15.5px;margin:12px 0}
+.ref h4{margin:14px 0 4px;font-size:15px}
+.ref ul{margin:0;padding-left:20px}
+.ref li{margin:3px 0;font-size:15px}
+.foot-meta{margin-top:18px;font-size:13.5px;color:var(--on3)}
+.empty-pane{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:60px 20px;color:var(--on2)}
+.empty-pane .ms{font-size:40px;color:var(--on3)}
+
+/* 증례 관리 */
+.case-row{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+.case-row:last-child{border-bottom:0}
+.case-row:hover{background:var(--s1)}
+.list{overflow:hidden}
+.cr-main{flex:1;min-width:0}
+.cr-t{font-size:16px;font-weight:600}
+.cr-m{font-size:14px;color:var(--on2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{height:44px;padding:0 14px;border:0;background:transparent;color:var(--on2);font-size:15.5px;font-weight:600;cursor:pointer;position:relative;white-space:nowrap;flex:none}
+.tab.on{color:var(--pri)}
+.tab.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--pri)}
+.ed{margin-bottom:14px}
+.ed .g2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 14px}
+.ed h3{display:flex;align-items:baseline;gap:8px}
+.ed h3 small{font-weight:400;font-size:14px;color:var(--on3)}
+.rows-h{display:grid;gap:8px;font-size:13px;color:var(--on3);font-weight:600;padding:0 2px 6px}
+.erow{display:grid;gap:8px;align-items:start;margin-bottom:8px}
+.erow textarea.inp{min-height:42px}
+
+/* ── 대화상자·메뉴·알림 ── */
+.scrim-dlg{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:24px;z-index:60;opacity:0;transition:opacity .15s}
+.scrim-dlg.on{opacity:1}
+.dlg{width:min(520px,100%);max-height:min(88dvh,860px);display:flex;flex-direction:column;background:var(--surface);border-radius:var(--r3);box-shadow:var(--shadow)}
+.dlg.wide{width:min(760px,100%)}
+.dlg-h{display:flex;align-items:center;gap:8px;padding:18px 12px 4px 22px}
+.dlg-h h2{flex:1;font-size:20px}
+.dlg-b{padding:6px 22px 6px;overflow-y:auto}
+.dlg-a{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px 18px;flex-wrap:wrap}
+.dlg-a .left{margin-right:auto}
+.dlg-msg{color:var(--on2);font-size:15.5px}
+.pk-list{display:flex;flex-direction:column;gap:6px;max-height:46dvh;overflow-y:auto;margin:10px 0 16px}
+.pk{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.pk:hover{background:var(--s1)}
+.pk.on{border-color:var(--pri);background:var(--pri-c);color:var(--on-pri-c)}
+.pk.on .num{background:var(--pri);color:var(--on-pri)}
+.pk-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.pk .cc{font-size:16px;font-weight:600}
+.pk .who{font-size:14px;color:var(--on2)}
+.pk.on .who{color:inherit;opacity:.8}
+.pk-mode{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rules{list-style:none;margin:0;padding:0}
+.rules li{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}
+.rules li:last-child{border-bottom:0}
+.rules .ms{color:var(--pri);margin-top:2px}
+.rules b{display:block}
+.rules p{color:var(--on2);font-size:15px}
+.menu{position:fixed;z-index:70;min-width:220px;max-width:min(360px,92vw);max-height:70dvh;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--shadow);padding:6px 0}
+.menu button{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 14px;border:0;background:transparent;font-size:15px;cursor:pointer;text-align:left}
+.menu button:hover{background:var(--s2)}
+.menu button.on{background:var(--pri-c);color:var(--on-pri-c)}
+.menu button .ms{color:var(--on2)}
+.menu .danger,.menu .danger .ms{color:var(--bad)}
+.menu .pop{padding:10px 14px 12px}
+.menu .search{margin:4px 8px 6px}
+.menu hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.mi-main{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.mi-main small{color:var(--on2);font-size:13px}
+#toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
+.toast{background:#2b2f37;color:#f2f3f5;padding:11px 16px;border-radius:var(--r2);font-size:15px;box-shadow:var(--shadow);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;display:flex;gap:8px;align-items:center}
+.toast.on{opacity:1;transform:none}
+.toast .ms{color:#ffb4ab;font-size:20px}
+.busy{position:fixed;inset:0;background:var(--scrim);display:none;align-items:center;justify-content:center;z-index:65;padding:24px}
+.busy.on{display:flex}
+.busy-card{background:var(--surface);border-radius:var(--r3);padding:20px 24px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow);font-size:16px;font-weight:500}
+.spinner{width:26px;height:26px;border:3px solid var(--pri-c);border-top-color:var(--pri);border-radius:50%;animation:spin .9s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+#login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:90;padding:24px}
+#login.on{display:flex}
+.login-card{width:min(380px,100%);background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);padding:34px 26px 26px;text-align:center}
+.login-card .hero{margin:0 auto 16px}
+.login-card h1{margin-bottom:6px}
+.login-card .inp{margin-top:20px;text-align:center}
+.pw-err{min-height:24px;margin:8px 0 10px;color:var(--bad);font-size:14.5px}
+.login-card .meta{margin-top:14px;font-size:13.5px;color:var(--on3)}
+
+/* ── 휴대폰 ── */
+@media (max-width:840px){
+  :root{--appbar:56px}
+  .hide-m{display:none!important}
+  .appbar{padding:0 4px}
+  body.has-ctx .brand{display:none}
+  .ctx{display:block;flex:1}
+  .drawer{top:0;z-index:40;width:min(320px,86vw);transform:translateX(-100%);box-shadow:var(--shadow)}
+  body.drawer-hidden .drawer{transform:translateX(-100%)}
+  body.drawer-open .drawer{transform:none}
+  body.drawer-open .drawer-scrim{display:block}
+  .drawer-mhead{display:flex;align-items:center;justify-content:space-between;padding:8px 6px 0 14px}
+  .main,body.drawer-hidden .main{margin-left:0}
+  .content{padding:18px 16px 56px}
+  .ch-in{padding:6px 12px 0}
+  .pt-info{display:none}
+  .ch-chips{flex:1}
+  .ctabs{margin-top:2px}
+  .ctab{padding:0 12px;flex:1;justify-content:center}
+  .log{padding:16px 12px 12px}
+  .pane{padding:18px 16px 40px}
+  .bub,.tn{max-width:88%}
+  .composer-in{padding:8px 10px 10px}
+  .stats{grid-template-columns:1fr 1fr}
+  .stat:nth-child(3){border-left:0}
+  .stat:nth-child(n+3){border-top:1px solid var(--line)}
+  .dom-why{padding-left:12px}
+  .sx{grid-template-columns:1fr}
+  .page-head{flex-wrap:nowrap;align-items:center}
+  .ph-main{min-width:0}
+  .ph-main h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  h1{font-size:21px}
+}
+@media (max-width:600px){
+  .scrim-dlg{align-items:flex-end;padding:0}
+  .dlg,.dlg.wide{width:100%;max-height:94dvh;border-radius:var(--r3) var(--r3) 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .hide-xs{display:none!important}
+  .erow{grid-template-columns:1fr 40px!important}
+  .erow>*:not(.iconbtn){grid-column:1}
+  .erow>.iconbtn{grid-column:2;grid-row:1}
+  .rows-h{display:none}
+  .page-head .ph-act .btn .t{display:none}
+  .page-head .ph-act .btn{padding:0 10px}
+  .page-head .ph-act .btn .ms{margin:0}
+}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <button class="iconbtn" id="menuBtn" title="메뉴"><span class="ms">menu</span></button>
+  <a class="brand" href="#"><span class="ms f">stethoscope</span><span class="t">CPX 가상 환자</span></a>
+  <div class="ctx" id="ctxTitle"></div>
+  <div class="spacer"></div>
+  <button class="iconbtn hide-m" id="rulesBtn" title="진료 규칙"><span class="ms">help</span></button>
+  <button class="iconbtn" id="acctBtn" title="계정"><span class="ms">account_circle</span></button>
+</header>
+
+<div class="drawer-scrim" id="drawerScrim"></div>
+<nav class="drawer" id="drawer">
+  <div class="drawer-mhead"><span class="brand"><span class="ms f">stethoscope</span>CPX 가상 환자</span><button class="iconbtn" id="drawerClose" title="닫기"><span class="ms">close</span></button></div>
+  <div class="drawer-top">
+    <button class="psel" id="pselBtn" title="환자 고르기"></button>
+    <button class="btn filled newbtn" id="newBtn"><span class="ms">add</span>새 진료</button>
+  </div>
+  <div class="drawer-list" id="sideHist"></div>
+  <div class="drawer-foot">
+    <a class="ni" href="#admin" id="adminLink"><span class="ms">library_books</span><span class="ni-main ni-t">증례 관리</span></a>
+  </div>
+</nav>
+
+<main class="main">
+  <section id="v-home" class="content" hidden></section>
+  <section id="v-conv" hidden>
+    <div class="conv">
+      <div class="conv-head"><div class="ch-in">
+        <div class="ch-row">
+          <div class="pt-info"><div class="pt-name" id="cvName"></div><div class="pt-sub" id="cvSub"></div></div>
+          <div class="ch-chips"><span class="chip" id="cvTurn"></span><span class="chip" id="cvTime"></span></div>
+          <button class="iconbtn" id="cvVit" title="활력징후"><span class="ms">monitor_heart</span></button>
+          <button class="iconbtn" id="cvMore" title="더 보기"><span class="ms">more_vert</span></button>
+        </div>
+        <div class="ctabs" id="cvTabs">
+          <button class="ctab" data-t="chat"><span class="ms">forum</span>대화</button>
+          <button class="ctab" data-t="soap"><span class="ms">edit_note</span>SOAP 기록</button>
+          <button class="ctab" data-t="result"><span class="ms">insights</span>결과</button>
+        </div>
+      </div></div>
+      <div class="cbody" id="cvBody"></div>
+      <div class="composer" id="composer"><div class="composer-in">
+        <div class="acts" id="act">
+          <button class="act on" data-a="SAY" title="SAY"><span class="ms">chat</span>대화</button>
+          <button class="act" data-a="EXAM" title="EXAM"><span class="ms">stethoscope</span>진찰</button>
+          <button class="act" data-a="TEST" title="TEST"><span class="ms">science</span>검사</button>
+        </div>
+        <div class="inbox"><input id="txt" autocomplete="off" enterkeyhint="send"><span class="count" id="count"></span><button class="send" id="sendBtn" title="보내기"><span class="ms f">send</span></button></div>
+      </div></div>
+    </div>
+  </section>
+  <section id="v-admin" class="content" hidden></section>
+  <section id="v-edit" class="content" hidden></section>
+</main>
+
+<div id="login"><form class="login-card" id="pwForm">
+  <div class="hero"><span class="ms f">stethoscope</span></div>
+  <h1>CPX 가상 환자</h1>
+  <p class="dlg-msg">비밀번호를 입력하세요</p>
+  <input type="text" name="username" value="cpx" autocomplete="username" hidden>
+  <input class="inp" id="pw" type="password" autocomplete="current-password" placeholder="비밀번호">
+  <div class="pw-err" id="pwErr"></div>
+  <button class="btn filled block" id="pwGo">들어가기</button>
+  <p class="meta">한 번 들어오면 이 브라우저에서 <span id="pwDays">1</span>일 동안 유지됩니다</p>
+</form></div>
+<div class="busy" id="busy"><div class="busy-card"><div class="spinner"></div><span id="busyMsg"></span></div></div>
+<div id="toasts"></div>
+
+<script>
+/* ───── 기본 도구 ───── */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const I = (n, f) => `<span class="ms${f ? " f" : ""}" aria-hidden="true">${n}</span>`;
+const DOMAINS = [["정보수집",25],["진단추론",15],["검사·추적",10],["안전",15],["의사소통",15],["효율",20]];
+const VIEWS = ["home","conv","admin","edit"];
+const ACTS = {SAY:{icon:"chat", label:"대화"}, EXAM:{icon:"stethoscope", label:"진찰"}, TEST:{icon:"science", label:"검사"}};
+const VERD = {good:["check_circle","좋음"], warn:["error","아쉬움"], bad:["cancel","틀림"]};
+const isMobile = () => matchMedia("(max-width: 840px)").matches;
+const API = (window.SP_CONFIG && SP_CONFIG.api) || "";
+const store = {get: k => { try { return localStorage.getItem(k) || ""; } catch(e){ return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch(e){} }};
+let TOKEN = store.get("sp_token");
+let CFG = {max_turns:50, max_min:0, maxlen:30}, CASES = [], HIST = [], PSEL = store.get("sp_patient") || "all";
+let CV = null, cvTab = "chat", soapEdit = false, act = "SAY", timer = null, renderSeq = 0, prevHash = null;
+const PENDING = new Set();   // 대답을 기다리는 진료. 그사이 다른 진료로 옮겨 가도 된다.
+const DRAFT = {};            // 진료마다 쓰다 만 입력
+
+async function api(path, body){
+  const h = TOKEN ? {Authorization: "Bearer " + TOKEN} : {};
+  const r = await fetch(API + path, body ? {method:"POST", headers:{...h, "Content-Type":"application/json"}, body:JSON.stringify(body)} : {headers:h});
+  const j = await r.json().catch(() => ({error:"응답을 읽지 못했습니다"}));
+  if (r.status === 401) { askLogin(); const e = new Error(j.error || "비밀번호를 입력해 주세요"); e.auth = true; throw e; }
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+const fail = e => { if (!e.auth) toast(e.message, true); };
+function show(v){ for (const id of VIEWS) $("#v-" + id).hidden = id !== v; document.body.dataset.view = v; if (v !== "conv") window.scrollTo(0, 0); }
+function setCtx(t){ $("#ctxTitle").textContent = t || ""; document.body.classList.toggle("has-ctx", !!t); }
+function setBusy(on, msg){ $("#busy").classList.toggle("on", on); if (msg) $("#busyMsg").textContent = msg; }
+function toast(msg, err){
+  const t = document.createElement("div"); t.className = "toast";
+  t.innerHTML = (err ? I("error") : "") + `<span>${esc(msg)}</span>`;
+  $("#toasts").appendChild(t); requestAnimationFrame(() => t.classList.add("on"));
+  setTimeout(() => { t.classList.remove("on"); setTimeout(() => t.remove(), 250); }, err ? 5000 : 2600);
+}
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2,"0")}:${String(Math.floor(s) % 60).padStart(2,"0")}`;
+
+/* 대화상자: {el, done(Promise), close(v)} */
+function dialog({title, body = "", actions = [], cls = "", dismiss = true}){
+  const w = document.createElement("div"); w.className = "scrim-dlg";
+  w.innerHTML = `<div class="dlg ${cls}" role="dialog" aria-modal="true">
+    ${title ? `<div class="dlg-h"><h2>${esc(title)}</h2>${dismiss ? `<button class="iconbtn" data-x title="닫기">${I("close")}</button>` : ""}</div>` : ""}
+    <div class="dlg-b">${body}</div>
+    ${actions.length ? `<div class="dlg-a">${actions.map((a, i) => `<button class="btn ${a.kind || "text"}${a.left ? " left" : ""}" data-i="${i}"${a.id ? ` id="${a.id}"` : ""}>${a.icon ? I(a.icon) : ""}${esc(a.label)}</button>`).join("")}</div>` : ""}</div>`;
+  document.body.appendChild(w);
+  let resolve; const done = new Promise(r => resolve = r);
+  const onKey = e => { if (e.key === "Escape" && dismiss && w.isConnected) close(null); };
+  const close = v => { if (!w.isConnected) return; w.remove(); document.removeEventListener("keydown", onKey); resolve(v); };
+  document.addEventListener("keydown", onKey);
+  w.addEventListener("mousedown", e => { if (e.target === w && dismiss) close(null); });
+  $$("[data-x]", w).forEach(b => b.onclick = () => close(null));
+  $$(".dlg-a [data-i]", w).forEach(b => b.onclick = () => { const a = actions[+b.dataset.i]; a.onClick ? a.onClick(close, w) : close(a.value); });
+  requestAnimationFrame(() => w.classList.add("on"));
+  return {el: w, done, close};
+}
+async function ask(title, msg, ok = "확인", danger = false){
+  return !!(await dialog({title, body:`<p class="dlg-msg">${esc(msg)}</p>`, actions:[{label:"취소", value:false}, {label:ok, value:true, kind: danger ? "danger" : "filled"}]}).done);
+}
+async function askText(title, label, ph){
+  const d = dialog({title, body:`<div class="fld"><label>${esc(label)}</label><input class="inp" id="atx" placeholder="${esc(ph || "")}"></div>`,
+    actions:[{label:"취소", value:null}, {label:"확인", kind:"filled", onClick:(close, el) => close($("#atx", el).value.trim() || null)}]});
+  setTimeout(() => $("#atx", d.el).focus(), 30);
+  $("#atx", d.el).onkeydown = e => { if (e.key === "Enter" && !e.isComposing) d.close($("#atx", d.el).value.trim() || null); };
+  return d.done;
+}
+/* 메뉴·작은 창: 누른 버튼 아래에 띄운다 */
+let MENU = null;
+function closeMenu(){ if (MENU) { MENU.remove(); MENU = null; } }
+function popup(anchor, html, alignLeft){
+  closeMenu();
+  const m = document.createElement("div"); m.className = "menu"; m.innerHTML = html; document.body.appendChild(m); MENU = m;
+  const r = anchor.getBoundingClientRect(), mw = Math.max(m.offsetWidth, alignLeft ? r.width : 0), mh = m.offsetHeight;
+  if (alignLeft) m.style.width = mw + "px";
+  m.style.left = Math.max(8, Math.min(alignLeft ? r.left : r.right - mw, innerWidth - mw - 8)) + "px";
+  m.style.top = (r.bottom + 6 + mh > innerHeight ? Math.max(8, r.top - mh - 6) : r.bottom + 6) + "px";
+  setTimeout(() => document.addEventListener("mousedown", function off(e){ if (!m.contains(e.target)) { closeMenu(); document.removeEventListener("mousedown", off); } }), 0);
+  return m;
+}
+function menu(anchor, items){
+  const m = popup(anchor, items.map((it, i) => it === "-" ? "<hr>" : `<button data-i="${i}" class="${it.danger ? "danger" : ""}">${I(it.icon)}<span class="mi-main">${esc(it.label)}${it.sub ? `<small>${esc(it.sub)}</small>` : ""}</span></button>`).join(""));
+  $$("button[data-i]", m).forEach(b => b.onclick = () => { closeMenu(); items[+b.dataset.i].onClick(); });
+}
+
+/* ───── 비밀번호 ───── */
+function askLogin(){
+  if ($("#login").classList.contains("on")) return;
+  closeMenu(); $$(".scrim-dlg").forEach(x => x.remove());
+  $("#login").classList.add("on"); $("#pwErr").textContent = ""; setTimeout(() => $("#pw").focus(), 30);
+}
+$("#pwForm").onsubmit = async ev => {
+  ev.preventDefault();
+  $("#pwGo").disabled = true; $("#pwErr").textContent = "";
+  try {
+    const r = await fetch(API + "/api/login", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({password:$("#pw").value})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { $("#pwErr").textContent = j.error || "들어가지 못했습니다"; $("#pw").select(); return; }
+    TOKEN = j.token || ""; store.set("sp_token", TOKEN);
+    $("#pw").value = ""; $("#login").classList.remove("on"); await init();
+  } catch(e){ $("#pwErr").textContent = "서버에 연결하지 못했습니다"; } finally { $("#pwGo").disabled = false; }
+};
+$("#acctBtn").onclick = e => menu(e.currentTarget, [
+  {icon:"help", label:"진료 규칙", onClick: showRules},
+  {icon:"logout", label:"로그아웃", onClick: async () => {
+    if (!await ask("로그아웃", "제출하지 않은 진료는 그대로 남아 있어, 다시 들어오면 이어 할 수 있습니다.", "로그아웃")) return;
+    await fetch(API + "/api/logout", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"}).catch(() => {});
+    TOKEN = ""; store.set("sp_token", ""); CV = null; clearInterval(timer); HIST = []; renderSide(); show("home"); askLogin();
+  }}]);
+$("#rulesBtn").onclick = showRules;
+
+/* ───── 사이드바: 환자 고르기 + 그 환자의 진료 기록 ───── */
+$("#menuBtn").onclick = () => {
+  if (isMobile()) document.body.classList.add("drawer-open");
+  else { const h = document.body.classList.toggle("drawer-hidden"); store.set("sp_drawer_hidden", h ? "1" : ""); }
+};
+if (store.get("sp_drawer_hidden")) document.body.classList.add("drawer-hidden");
+const closeDrawer = () => document.body.classList.remove("drawer-open");
+$("#drawerClose").onclick = closeDrawer; $("#drawerScrim").onclick = closeDrawer;
+
+async function loadCases(){
+  const j = await api("/api/cases");
+  CASES = j.cases; CFG = {max_turns:j.max_turns, max_min:j.max_min, maxlen:j.maxlen};
+  if (PSEL !== "all" && !caseOf(PSEL)) setPatient("all");
+}
+async function refreshSide(){ try { HIST = (await api("/api/history")).rows; } catch(e){ return; } renderSide(); }
+function stampDate(n){ const m = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/.exec(n || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; }
+function dayGroup(n){
+  const d = stampDate(n); if (!d) return "그 이전";
+  const t = new Date(); t.setHours(0,0,0,0); const d0 = new Date(d); d0.setHours(0,0,0,0);
+  const diff = Math.round((t - d0) / 864e5);
+  return diff <= 0 ? "오늘" : diff === 1 ? "어제" : diff < 7 ? "지난 7일" : `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+}
+function fmtWhen(n){
+  const d = stampDate(n); if (!d) return "";
+  const hm = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  return dayGroup(n) === "오늘" ? hm : `${d.getMonth() + 1}월 ${d.getDate()}일 ${hm}`;
+}
+const caseOf = cid => CASES.find(c => c.cid === cid);
+function caseLabel(cid){ const c = caseOf(cid); return c ? `환자 ${c.no}` : `증례 ${cid || "?"}`; }
+const sexW = s => s === "여" ? "여성" : s === "남" ? "남성" : (s || "");
+const scoreCls = t => t >= 70 ? "g" : t >= 40 ? "y" : "r";
+function setPatient(cid){ PSEL = cid; store.set("sp_patient", cid === "all" ? "" : cid); renderSide(); }
+function renderPsel(){
+  const c = caseOf(PSEL), n = c ? HIST.filter(r => r.case === c.cid).length : HIST.length;
+  $("#pselBtn").innerHTML = c
+    ? `<span class="num pri">${c.no}</span><span class="psel-main"><span class="psel-t">${esc(c.cc)}</span><span class="psel-m">${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}</span></span>${I("unfold_more")}`
+    : `<span class="num">${I("groups")}</span><span class="psel-main"><span class="psel-t">모든 환자</span><span class="psel-m">환자 ${CASES.length}명 · 진료 ${n}</span></span>${I("unfold_more")}`;
+}
+$("#pselBtn").onclick = e => {
+  const anchor = e.currentTarget, many = CASES.length > 6;
+  const rows = q => [{cid:"all"}, ...CASES].filter(c => c.cid === "all" ? !q : `${c.no} ${c.cc} ${c.age}세 ${sexW(c.sex)}`.toLowerCase().includes(q)).map(c => {
+    const n = HIST.filter(r => c.cid === "all" || r.case === c.cid).length, live = HIST.filter(r => r.live && (c.cid === "all" || r.case === c.cid)).length;
+    return `<button data-c="${esc(c.cid)}" class="${PSEL === c.cid ? "on" : ""}">${c.cid === "all" ? `<span class="num">${I("groups")}</span>` : `<span class="num">${c.no}</span>`}
+      <span class="mi-main">${c.cid === "all" ? "모든 환자" : esc(c.cc)}<small>${c.cid === "all" ? `진료 ${n}` : `${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}`}</small></span>${live ? `<span class="live-badge"><i></i>${live}</span>` : ""}</button>`;
+  }).join("") || `<div class="side-empty">찾는 환자가 없습니다</div>`;
+  const m = popup(anchor, `${many ? `<div class="search">${I("search")}<input id="pq" placeholder="번호·주호소로 찾기" autocomplete="off"></div>` : ""}<div id="plist">${rows("")}</div>`, true);
+  const wire = () => $$("#plist button", m).forEach(b => b.onclick = () => { closeMenu(); setPatient(b.dataset.c); });
+  wire();
+  if (many) { const q = $("#pq", m); q.focus(); q.oninput = () => { $("#plist", m).innerHTML = rows(q.value.trim().toLowerCase()); wire(); }; }
+};
+$("#newBtn").onclick = e => {
+  const c = caseOf(PSEL);
+  if (!c) { closeDrawer(); openPicker(); return; }
+  menu(e.currentTarget, [
+    {icon:"chat", label:"예선으로 시작", sub:"대화와 진찰", onClick: () => startConv(c.cid, "예선")},
+    {icon:"science", label:"본선으로 시작", sub:"대화·진찰에 검사까지", onClick: () => startConv(c.cid, "본선")}]);
+};
+function navItem(r){
+  const href = "#c/" + r.name, one = PSEL !== "all";
+  const t = r.title || (one ? `${fmtWhen(r.name)} 진료` : `${caseLabel(r.case)} · ${r.cc || caseOf(r.case)?.cc || ""}`);
+  const m = one ? `${r.mode || ""} · ${r.turns}턴${r.dx ? " · " + r.dx : ""}` : `${fmtWhen(r.name)} · ${r.mode || ""} · ${r.turns}턴`;
+  const right = r.live ? `<span class="live-badge"><i></i>진행 중</span>` : `<span class="score-badge ${scoreCls(r.total)}">${r.total}</span>`;
+  return `<a class="ni${prevHash && prevHash.startsWith(href) && (prevHash === href || prevHash[href.length] === "/") ? " on" : ""}" href="${esc(href)}"><div class="ni-main"><div class="ni-t">${esc(t)}</div><div class="ni-m">${esc(m)}</div></div>${right}</a>`;
+}
+function renderSide(){
+  renderPsel();
+  const rows = HIST.filter(r => PSEL === "all" || r.case === PSEL);
+  let out = "", g = null;
+  const live = rows.filter(r => r.live);
+  if (live.length) out += `<div class="grp">진행 중</div>` + live.map(navItem).join("");
+  for (const r of rows.filter(r => !r.live)) {
+    const k = dayGroup(r.name);
+    if (k !== g) { out += `<div class="grp">${k}</div>`; g = k; }
+    out += navItem(r);
+  }
+  $("#sideHist").innerHTML = out || `<div class="side-empty">아직 이 환자의 진료가 없습니다</div>`;
+  $("#adminLink").classList.toggle("on", /^#(admin|edit\/)/.test(prevHash || ""));
+}
+
+/* ───── 화면 이동 (#주소로 오가며, 브라우저 뒤로 가기도 된다) ───── */
+function go(h){ if (decodeURIComponent(location.hash) === h) route(); else location.hash = h; }
+window.addEventListener("hashchange", route);
+async function route(){
+  const h = decodeURIComponent(location.hash || "");
+  if (prevHash && prevHash.startsWith("#edit/") && h !== prevHash && ED) {
+    if ((ED._unsaved || edDirty) && !await ask("저장하지 않은 변경", "이 증례에 저장하지 않은 변경이 있습니다. 나갈까요?", "나가기", true)) { history.replaceState(null, "", prevHash); return; }
+    ED = null; edDirty = false;
+  }
+  const m = /^#c\/([^/]+)(?:\/(chat|soap|result))?$/.exec(h) || /^#r\/([^/]+)$/.exec(h);
+  if (m && CV && CV.name === m[1]) { prevHash = h; setTab(m[2] || "chat", true); renderSide(); return; }  // 같은 진료 안에서 탭만 바꿈
+  leaveConv();
+  prevHash = h; closeDrawer(); closeMenu(); renderSide(); setCtx("");
+  try {
+    if (m) await openConv(m[1], m[2] || "chat");
+    else if (h === "#admin") await loadAdmin();
+    else if (h.startsWith("#edit/")) await openEditorRoute(h.slice(6));
+    else renderHome();
+  } catch(e){ fail(e); if (!e.auth) renderHome(); }
+}
+
+/* ───── 처음 화면·규칙·새 진료 ───── */
+function renderHome(){
+  const c = caseOf(PSEL);
+  $("#v-home").innerHTML = `<div class="empty">
+    <div class="hero">${I("stethoscope", 1)}</div>
+    <h1>${c ? `환자 ${c.no} · ${esc(c.cc)}` : "진료를 시작해 보세요"}</h1>
+    <p>${c ? `${esc(c.age)}세 ${esc(sexW(c.sex))}. 새 진료를 시작하거나 왼쪽에서 지난 진료를 고르세요.` : "왼쪽 위에서 환자를 고르면 그 환자의 진료 기록이 보입니다."}</p>
+    <div class="row-btns"><button class="btn filled" id="homeNew">${I("add")}새 진료</button><button class="btn text" id="homeRules">${I("help")}진료 규칙</button></div>
+  </div>`;
+  $("#homeNew").onclick = e => c ? $("#newBtn").onclick({currentTarget: e.currentTarget}) : openPicker();
+  $("#homeRules").onclick = showRules;
+  show("home");
+}
+function showRules(){
+  const lim = CFG.max_min ? `${CFG.max_min}분 안에 끝내야 합니다 (넘기면 0점)` : "시간 제한은 없습니다 (대회는 20분)";
+  dialog({title:"진료 규칙", body:`<ul class="rules">
+    <li>${I("chat")}<div><b>대화 · 1턴</b><p>질문·설명·공감을 ${CFG.maxlen}자 이하로, 한 번에 하나씩 합니다.</p></div></li>
+    <li>${I("stethoscope")}<div><b>진찰 · 1턴</b><p>진찰 동작 하나를 문장으로 요청합니다. 진찰 목록은 주지 않습니다.</p></div></li>
+    <li>${I("science")}<div><b>검사 · 1턴</b><p>본선에서만 쓸 수 있습니다. 검사 하나씩 요청합니다.</p></div></li>
+    <li>${I("block")}<div><b>반려 · 0턴</b><p>${CFG.maxlen}자를 넘기거나 두 가지를 한꺼번에 물으면 돌려보냅니다. 턴은 줄지 않습니다.</p></div></li>
+    <li>${I("edit_note")}<div><b>SOAP 기록 · 제출</b><p>S·O·A·P와 주진단 1개를 쓰고 제출하면 진료가 끝나고 채점합니다.</p></div></li>
+    <li>${I("timer")}<div><b>${CFG.max_turns}턴까지</b><p>${lim}.</p></div></li>
+  </ul>`, actions:[{label:"확인", value:null, kind:"filled"}]});
+}
+function openPicker(){
+  let sel = null, m = "예선";
+  const d = dialog({title:"새 진료", body:`
+    ${CASES.length > 6 ? `<div class="search">${I("search")}<input id="pkQ" placeholder="번호·나이·주호소로 찾기" autocomplete="off"></div>` : ""}
+    <div class="pk-list" id="pkList"></div>
+    <div class="pk-mode"><div class="seg" id="pkMode"><button data-m="예선">예선</button><button data-m="본선">본선</button></div><span class="meta" id="pkHelp"></span></div>`,
+    actions:[{label:"취소", value:null}, {label:"진료 시작", value:"go", kind:"filled", id:"pkGo"}]});
+  const list = () => {
+    const q = ($("#pkQ", d.el)?.value || "").trim().toLowerCase();
+    $("#pkList", d.el).innerHTML = CASES.filter(c => !q || `${c.no} ${c.age}세 ${sexW(c.sex)} ${c.cc}`.toLowerCase().includes(q)).map(c =>
+      `<button class="pk${sel === c.cid ? " on" : ""}" data-c="${esc(c.cid)}"><span class="num">${c.no}</span><span class="pk-main"><span class="cc">${esc(c.cc)}</span><span class="who">${esc(c.age)}세 ${esc(sexW(c.sex))}</span></span></button>`
+    ).join("") || `<div class="side-empty">찾는 환자가 없습니다</div>`;
+    $$(".pk", d.el).forEach(b => { b.onclick = () => { sel = b.dataset.c; list(); upd(); }; b.ondblclick = () => { sel = b.dataset.c; d.close("go"); }; });
+  };
+  const upd = () => {
+    $("#pkGo", d.el).disabled = !sel;
+    $$("#pkMode button", d.el).forEach(b => b.classList.toggle("on", b.dataset.m === m));
+    $("#pkHelp", d.el).textContent = m === "본선" ? "대화·진찰에 검사까지 합니다" : "대화와 진찰만 합니다";
+  };
+  $$("#pkMode button", d.el).forEach(b => b.onclick = () => { m = b.dataset.m; upd(); });
+  $("#pkQ", d.el)?.addEventListener("input", list);
+  list(); upd();
+  d.done.then(v => { if (v === "go" && sel) { setPatient(sel); startConv(sel, m); } });
+}
+async function startConv(cid, mode){
+  closeDrawer(); setBusy(true, "환자를 부르는 중…");
+  try { const v = await api("/api/start", {cid, mode}); await refreshSide(); go("#c/" + v.name); }
+  catch(e){ fail(e); } finally { setBusy(false); }
+}
+
+/* ───── 진료 화면 (대화 · SOAP 기록 · 결과) ───── */
+function leaveConv(){
+  if (CV && !CV.done) DRAFT[CV.name] = $("#txt").value;
+  CV = null; clearInterval(timer); closeMenu();
+}
+async function openConv(name, tab){
+  const v = await api("/api/conv?name=" + encodeURIComponent(name));
+  CV = v; CV.seq = ++renderSeq; CV.t0 = Date.now() - (v.elapsed_sec || 0) * 1000; soapEdit = false;
+  const p = v.patient || {}, c = caseOf(v.case);
+  if (c && PSEL !== "all" && PSEL !== c.cid) setPatient(c.cid);
+  $("#cvName").textContent = `${p.name || ""} · ${p.age}세 ${p.sex || ""}`;
+  $("#cvSub").textContent = `${c ? `환자 ${c.no} · ` : ""}${p.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
+  setCtx(`${p.name || ""} · ${p.cc || ""}`);
+  const tb = $("#act [data-a=TEST]"); tb.disabled = v.mode !== "본선"; tb.title = tb.disabled ? "검사는 본선에서만 할 수 있습니다" : "TEST";
+  $("#txt").value = DRAFT[v.name] || "";
+  setAct("SAY", true); updHead();
+  clearInterval(timer); if (!v.done) timer = setInterval(updHead, 1000);
+  show("conv"); setTab(tab, true);
+}
+function updHead(){
+  if (!CV) return;
+  $("#cvTurn").textContent = `${CV.turn} / ${CV.max_turns}턴`;
+  $("#cvTurn").classList.toggle("warn", !CV.done && CV.turn >= CV.max_turns - 5);
+  const sub = CV.submit;
+  if (CV.done) { $("#cvTime").className = "chip " + scoreCls(sub.total); $("#cvTime").innerHTML = `${I("insights")}${sub.total}점`; return; }
+  const el = Math.floor((Date.now() - CV.t0) / 1000);
+  $("#cvTime").className = "chip hide-xs";
+  if (CV.max_min) { const rem = Math.max(0, CV.max_min * 60 - el); $("#cvTime").innerHTML = `${I("timer")}${mmss(rem)}`; $("#cvTime").classList.toggle("warn", rem <= 180); }
+  else $("#cvTime").innerHTML = `${I("schedule")}${mmss(el)}`;
+}
+function setTab(t, fromRoute){
+  if (!CV) return;
+  cvTab = t;
+  $$("#cvTabs .ctab").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+  const want = "#c/" + CV.name + (t === "chat" ? "" : "/" + t);
+  if (!fromRoute && decodeURIComponent(location.hash) !== want) { history.replaceState(null, "", want); prevHash = want; }
+  $("#composer").hidden = !(t === "chat" && !CV.done);
+  if (t === "chat") renderChat(); else { if (t === "soap") renderSoap(); else renderResult(); body().scrollTop = 0; }
+}
+$$("#cvTabs .ctab").forEach(b => b.onclick = () => setTab(b.dataset.t));
+$("#cvVit").onclick = e => { if (CV) popup(e.currentTarget, `<div class="pop"><b>활력징후</b>${vitHTML(CV.patient?.vitals)}</div>`); };
+$("#cvMore").onclick = e => { if (CV) menu(e.currentTarget, [
+  {icon:"edit", label:"제목·메모", onClick: () => editMeta(CV)},
+  {icon:"help", label:"진료 규칙", onClick: showRules},
+  "-",
+  {icon:"delete", label:"이 진료 삭제", danger:true, onClick: async () => {
+    if (!await ask("진료 삭제", "이 진료 기록을 휴지통(results/sp_sim/_trash)으로 옮깁니다.", "삭제", true)) return;
+    try { await api("/api/record/delete", {name:CV.name}); toast("휴지통으로 옮겼습니다"); CV = null; await refreshSide(); go("#"); } catch(e){ fail(e); }
+  }}]); };
+
+/* 대화 탭 */
+const body = () => $("#cvBody");
+function scrollEnd(){ const w = body(); w.scrollTop = w.scrollHeight; }
+function resBody(t){ const s = String(t ?? ""), i = s.indexOf(":"); return i > 0 && i < 40 ? `<b>${esc(s.slice(0, i))}</b>${esc(s.slice(i + 1).trim())}` : esc(s); }
+function vitParts(v){ return String(v || "").split(/[;,]\s*(?=[^:;,]{1,14}:)/).map(x => x.trim()).filter(Boolean).map(x => { const i = x.indexOf(":"); return i > 0 ? [x.slice(0, i).trim(), x.slice(i + 1).trim()] : ["", x]; }); }
+function vitHTML(v){ return `<div class="vit-grid">${vitParts(v).map(([k, x]) => `<span><small>${esc(k)}</small>${esc(x)}</span>`).join("")}</div>`; }
+const hPt = t => `<div class="row pt"><div class="av">${I("person")}</div><div class="bub">${esc(t)}</div></div>`;
+const hDoc = (t, a, turn, rej) => { const k = ACTS[a] || ACTS.SAY; return `<div class="row doc${rej ? " rej" : ""}">${turn ? `<span class="turn">${turn}</span>` : ""}<div class="bub">${a !== "SAY" ? `<span class="bub-act">${I(k.icon)}${k.label}</span>` : ""}${esc(t)}</div></div>`; };
+const hRes = (t, a) => { const k = ACTS[a] || ACTS.EXAM; return `<div class="event ${a === "TEST" ? "test" : "exam"}">${I(k.icon)}<div>${resBody(t)}</div></div>`; };
+const hRej = why => `<div class="note-line">${I("block")}<span>${esc(why)}<small>반려 · 턴 차감 없음</small></span></div>`;
+const hInfo = t => `<div class="note-line info">${I("info")}<span>${esc(t)}</span></div>`;
+const hTyping = () => `<div class="row pt typing"><div class="av">${I("person")}</div><div class="bub dots"><i></i><i></i><i></i></div></div>`;
+function hTurnNote(n){ if (!n) return ""; const [ic] = VERD[n.verdict] || VERD.warn; return `<div class="tn ${esc(n.verdict)}">${I(ic, 1)}<span>${esc(n.note || "")}</span></div>`; }
+function renderChat(){
+  const v = CV, p = v.patient || {}, notes = {};
+  for (const n of v.submit?.judge?.turn_notes || []) notes[+n.turn] = n;
+  let h = "";
+  if (v.done) {
+    const cnt = k => (v.submit.judge?.turn_notes || []).filter(n => n.verdict === k).length;
+    h += (v.submit.judge?.turn_notes || []).length
+      ? `<div class="sumbar legend"><b style="color:var(--on)">턴 평가</b><span style="color:var(--ok)">${I("check_circle", 1)}좋음 ${cnt("good")}</span><span style="color:#c58a1d">${I("error", 1)}아쉬움 ${cnt("warn")}</span><span style="color:var(--bad)">${I("cancel", 1)}불필요 ${cnt("bad")}</span></div>`
+      : `<div class="sumbar">${I("info")}다시 채점하면 턴마다 평가가 붙습니다</div>`;
+  }
+  h += hPt(p.opening);
+  if (p.vitals) h += `<div class="event vit">${I("monitor_heart")}<div><b>활력징후</b>${vitHTML(p.vitals)}</div></div>`;
+  for (const e of v.events || []) {
+    if (e.type === "reject") { h += hDoc(e.text, e.act, null, true) + hRej(e.why); continue; }
+    h += hDoc(e.text, e.act, e.turn) + hTurnNote(notes[+e.turn]) + (e.act === "SAY" ? hPt(e.out) : hRes(e.out, e.act));
+  }
+  if (PENDING.has(v.name)) h += hTyping();
+  if (!v.done && !(v.events || []).length) h += hInfo("환자에게 첫 질문을 해 보세요. SOAP는 'SOAP 기록' 탭에서 씁니다.");
+  body().innerHTML = `<div class="log" id="log">${h}</div>`;
+  $("#sendBtn").disabled = PENDING.has(v.name);
+  scrollEnd(); if (!v.done && !isMobile()) $("#txt").focus();
+}
+function setAct(a, quiet){
+  act = a;
+  $$("#act .act").forEach(x => x.classList.toggle("on", x.dataset.a === a));
+  $("#txt").placeholder = {SAY:"환자에게 할 말 (한 번에 하나)", EXAM:"진찰 하나 (예: 배를 눌러 볼게요)", TEST:"검사 하나 (예: CBC 볼게요)"}[a];
+  updCount(); if (!quiet) $("#txt").focus();
+}
+$$("#act .act").forEach(b => b.onclick = () => { if (!b.disabled) setAct(b.dataset.a); });
+function updCount(){
+  const n = [...$("#txt").value].length;
+  $("#count").textContent = act === "SAY" ? `${n}/${CFG.maxlen}` : "";
+  $("#count").classList.toggle("over", act === "SAY" && n > CFG.maxlen);
+}
+$("#txt").addEventListener("input", updCount);
+$("#txt").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); send(); } });
+$("#sendBtn").onclick = send;
+async function send(){
+  const text = $("#txt").value.trim();
+  if (!text || !CV || CV.done || PENDING.has(CV.name)) return;
+  const name = CV.name, seq = CV.seq, a = act, log = () => $("#log");
+  PENDING.add(name); $("#sendBtn").disabled = true;
+  log().insertAdjacentHTML("beforeend", hDoc(text, a) + hTyping()); scrollEnd();
+  $("#txt").value = ""; DRAFT[name] = ""; updCount();
+  let r = null, err = null;
+  try { r = await api("/api/act", {name, act:a, text}); } catch(e){ err = e; }
+  PENDING.delete(name);
+  if (r && CV && CV.name === name) {  // 화면 상태에도 반영 (탭을 오가도 다시 그릴 수 있게)
+    const m = !r.ok && /^반려:\s*(.*?)\s*\(턴 차감 없음\)$/.exec(r.out || "");
+    if (r.ok) CV.events.push({type:"turn", turn:r.turn, act:r.act, text, out:r.out});
+    else if (m) CV.events.push({type:"reject", act:a, text, why:m[1]});
+    CV.turn = r.turn; CV.rejected = r.rejected;
+  }
+  if (CV && CV.name === name && CV.seq === seq && cvTab === "chat" && log()) {
+    $$("#log .typing").forEach(x => x.remove());
+    const last = $$("#log .row.doc").at(-1);
+    if (err) { if (!err.auth) log().insertAdjacentHTML("beforeend", hInfo(err.message)); }
+    else if (!r.ok) {
+      const m = /^반려:\s*(.*?)\s*\(턴 차감 없음\)$/.exec(r.out || "");
+      if (m) { last?.classList.add("rej"); log().insertAdjacentHTML("beforeend", hRej(m[1])); } else log().insertAdjacentHTML("beforeend", hInfo(r.out));
+    } else {
+      last?.insertAdjacentHTML("afterbegin", `<span class="turn">${r.turn}</span>`);
+      log().insertAdjacentHTML("beforeend", r.act === "SAY" ? hPt(r.out) + (r.tip ? hInfo("진찰 결과가 필요하면 '진찰'로 요청하세요") : "") : hRes(r.out, r.act));
+    }
+    scrollEnd(); updHead(); $("#sendBtn").disabled = false; if (!isMobile()) $("#txt").focus();
+  } else if (CV && CV.name === name) { updHead(); if (cvTab === "chat") renderChat(); }
+  refreshSide();
+}
+
+/* SOAP 기록 탭: 제출 전엔 쓰기(자동 저장), 제출 뒤엔 문장별 평가 */
+let draftTimer = null;
+function soapForm(pre, submitLabel){
+  const s = pre?.soap || {};
+  const fld = (k, hint) => `<div class="fld soap-f"><label><span class="soap-k">${k}</span>${hint}</label><textarea class="inp" data-k="${k}" rows="3">${esc(s[k] || "")}</textarea></div>`;
+  return `${fld("S","환자가 말한 것 — 주호소·현병력·과거력·약·사회력·가족력")}${fld("O","관찰·측정 — 활력징후·진찰 소견")}${fld("A","평가 — 주진단 가설·근거·감별")}${fld("P","계획 — 검사·처치·안전·추적·설명")}
+    <div class="fld"><label>주진단 1개</label><input class="inp" id="sDx" value="${esc(pre?.dx || "")}" placeholder="예) 급성 간헐성 포르피린증"></div>
+    <div class="soap-foot"><span class="meta" id="draftSt"></span><span class="spacer"></span>${soapEdit ? `<button class="btn outline" id="soapCancel">취소</button>` : ""}<button class="btn filled" id="soapGo">${I(soapEdit ? "refresh" : "assignment_turned_in")}${submitLabel}</button></div>`;
+}
+function readSoap(){ return {soap: Object.fromEntries($$("#cvBody textarea[data-k]").map(t => [t.dataset.k, t.value])), dx: $("#sDx").value.trim()}; }
+function growAll(){ const g = t => { t.style.height = "auto"; t.style.height = (t.scrollHeight + 2) + "px"; }; $$("#cvBody textarea").forEach(t => { g(t); t.addEventListener("input", () => g(t)); }); }
+function renderSoap(){
+  const v = CV;
+  if (!v.done) {
+    body().innerHTML = `<div class="pane"><p class="lead">대화·진찰로 얻은 것만 씁니다. 검사 결과가 없으면 필요한 검사는 P에 계획으로 씁니다. 쓰는 대로 저장됩니다.</p>${soapForm(v.draft, "제출하고 채점")}</div>`;
+    growAll();
+    $("#cvBody").oninput = () => {
+      v.draft = readSoap(); $("#draftSt").textContent = "저장 중…";
+      clearTimeout(draftTimer); draftTimer = setTimeout(async () => {
+        try { await api("/api/draft", {name:v.name, ...v.draft}); if (CV === v && $("#draftSt")) $("#draftSt").textContent = "저장됨"; }
+        catch(e){ if ($("#draftSt")) $("#draftSt").textContent = "저장 못 함"; }
+      }, 900);
+    };
+    $("#soapGo").onclick = async () => {
+      const {soap, dx} = readSoap();
+      if (!dx) { toast("주진단을 적어 주세요", true); $("#sDx").focus(); return; }
+      if (!await ask("제출하고 채점", "제출하면 이 진료가 끝나고 더 이상 대화할 수 없습니다.", "제출")) return;
+      clearTimeout(draftTimer); setBusy(true, "채점 중입니다 (30초~1분)");
+      try {
+        const nv = await api("/api/submit", {name:v.name, soap, dx});
+        delete DRAFT[v.name]; await refreshSide();
+        if (CV === v) { await openConv(v.name, "result"); history.replaceState(null, "", "#c/" + v.name + "/result"); prevHash = "#c/" + v.name + "/result"; renderSide(); }
+      } catch(e){ fail(e); } finally { setBusy(false); }
+    };
+    return;
+  }
+  const sub = v.submit, j = sub.judge || {};
+  if (soapEdit) {
+    body().innerHTML = `<div class="pane"><p class="lead">대화는 그대로 두고, 고친 기록으로 다시 채점합니다.</p>${soapForm({soap:sub.soap, dx:sub.dx}, "다시 채점")}</div>`;
+    growAll(); $("#cvBody").oninput = null;
+    $("#soapCancel").onclick = () => { soapEdit = false; renderSoap(); };
+    $("#soapGo").onclick = async () => {
+      const {soap, dx} = readSoap();
+      if (!dx) { toast("주진단을 적어 주세요", true); return; }
+      setBusy(true, "다시 채점하는 중 (30초~1분)");
+      try { await api("/api/record/rescore", {name:v.name, soap, dx}); refreshSide(); await openConv(v.name, "soap"); toast("다시 채점했습니다"); }
+      catch(e){ fail(e); } finally { setBusy(false); }
+    };
+    return;
+  }
+  $("#cvBody").oninput = null;
+  const split = sub.soap_split, lab = {};
+  for (const x of j.soap_sentences || []) lab[String(x.id || "").toUpperCase()] = x;
+  const cnt = k => (j.soap_sentences || []).filter(x => x.verdict === k).length;
+  let h = `<div class="pane"><div class="page-head" style="margin-bottom:6px"><div class="ph-main">${split && (j.soap_sentences || []).length
+      ? `<div class="legend"><span style="color:var(--ok)">${I("check_circle", 1)}좋음 ${cnt("good")}</span><span style="color:#c58a1d">${I("error", 1)}아쉬움 ${cnt("warn")}</span><span style="color:var(--bad)">${I("cancel", 1)}틀림 ${cnt("bad")}</span></div>`
+      : `<p class="meta">다시 채점하면 문장마다 평가가 붙습니다.</p>`}</div>
+    <div class="ph-act"><button class="btn outline" id="reBtn">${I("refresh")}<span class="t">고쳐서 다시 채점</span></button></div></div>`;
+  for (const k of "SOAP") {
+    const parts = split ? split[k] || [] : [];
+    h += `<div class="sx"><span class="soap-k">${k}</span><div class="sx-list">`;
+    if (split && parts.length) h += parts.map((t, i) => {
+      const x = lab[`${k}${i + 1}`], vd = x?.verdict in VERD ? x.verdict : "none", [ic] = VERD[vd] || ["remove"];
+      return `<div class="sn ${vd}">${I(ic, 1)}<div><div class="sn-t">${esc(t)}</div>${x ? `<div class="sn-n">${x.tag ? `<b>${esc(x.tag)}</b> · ` : ""}${esc(x.note || "")}</div>` : ""}</div></div>`;
+    }).join("");
+    else h += `<div class="sn none"><div class="sn-t" style="white-space:pre-wrap">${esc((sub.soap || {})[k]) || '<span class="meta">비어 있음</span>'}</div></div>`;
+    h += `</div></div>`;
+  }
+  const acc = j.accuracy ?? 0, [vc, vi, vt] = acc >= 90 ? ["g","check_circle","정답"] : acc >= 40 ? ["y","error","부분 정답"] : ["r","cancel","오답"];
+  h += `<div class="sx"><span class="soap-k">Dx</span><div class="sx-list"><div class="sn ${vc === "g" ? "good" : vc === "y" ? "warn" : "bad"}">${I(vi, 1)}<div><div class="sn-t">${esc(sub.dx)}</div><div class="sn-n"><b>${vt}</b> · 정답 ${esc(sub.truth)}</div></div></div></div></div>`;
+  const miss = [...(j.soap_top || []), ...(j.soap_more || [])];
+  if (miss.length) h += `<div class="sec-h"><h3>빠진 것·고칠 점</h3><span class="meta">${miss.length}개</span></div><div>${miss.map(missItem).join("")}</div>`;
+  h += `</div>`;
+  body().innerHTML = h;
+  $("#reBtn").onclick = () => { soapEdit = true; renderSoap(); };
+}
+const SEV = {"⛔":["r","report"], "🔴":["r","error"], "🟡":["y","warning"], "⚪":["n","info"]};
+function missItem(x){
+  const [cls, icon] = SEV[String(x.sev || "").trim()] || ["n", "info"];
+  const parts = String(x.text || "").split(/\s*→\s*/);
+  const what = parts[0] || "", why = parts.length > 2 ? parts.slice(1, -1).join(" → ") : parts[1] || "", fix = parts.length > 2 ? parts.at(-1).replace(/^이렇게:\s*/, "") : "";
+  return `<div class="miss"><span class="${cls}">${I(icon, 1)}</span><div style="flex:1;min-width:0"><div class="miss-what">${x.sec ? `<span class="soap-k" style="width:22px;height:22px;font-size:12px">${esc(x.sec)}</span>` : ""}${esc(what)} <span class="meta">${esc(x.tag || "")}</span></div>
+    ${why ? `<div class="miss-why">${esc(why)}</div>` : ""}${fix ? `<div class="miss-fix">${esc(fix)}</div>` : ""}</div></div>`;
+}
+
+/* 결과 탭: 턴·시간·점수 먼저, 나머지는 펼쳐서 */
+function renderResult(){
+  const v = CV;
+  if (!v.done) {
+    body().innerHTML = `<div class="empty-pane">${I("insights")}<p>SOAP를 제출하면 채점 결과가 여기에 나옵니다.</p><button class="btn tonal" id="toSoap">${I("edit_note")}SOAP 기록으로</button></div>`;
+    $("#toSoap").onclick = () => setTab("soap"); return;
+  }
+  const sub = v.submit, j = sub.judge || {}, pf = sub.patient || {}, sc = sub.scores || {}, u = sub.usage || {};
+  const acc = j.accuracy ?? 0, [vc, vi, vt] = acc >= 90 ? ["g","check_circle","주진단 정답"] : acc >= 40 ? ["y","error","주진단 부분 정답"] : ["r","cancel","주진단 오답"];
+  const secs = Math.round((sub.minutes || 0) * 60);
+  let h = `<div class="pane"><div class="stats">
+      <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${sub.total}<small>/ 100</small></div></div>
+      <div class="stat"><div class="k">사용 턴</div><div class="v">${sub.turns}<small>/ ${v.max_turns}</small></div></div>
+      <div class="stat"><div class="k">걸린 시간</div><div class="v">${Math.floor(secs / 60)}<small>분</small> ${secs % 60}<small>초</small></div></div>
+      <div class="stat"><div class="k">반려</div><div class="v">${sub.rejected}<small>회</small></div></div></div>
+    ${sub.overtime ? `<div class="callout">${I("timer")}<b>시간 초과로 무효(0점) 처리됐습니다</b></div>` : ""}
+    <div class="dxrow"><span class="chip ${vc}">${I(vi, 1)}${vt}</span><span><span class="lbl">제출</span>${esc(sub.dx)}</span><span><span class="lbl">정답</span>${esc(sub.truth)}</span></div>
+    <div class="sec-h"><h3>영역별 점수</h3><span class="meta">누르면 이유</span></div>
+    <div class="domains">${DOMAINS.map(([d, mx]) => { const x = sc[d] ?? 0, r = x / mx;
+      return `<button class="dom" aria-expanded="false"><span class="dn">${d}</span><span class="bar"><i class="${r >= .7 ? "g" : r >= .4 ? "y" : "r"}" style="width:${Math.round(100 * r)}%"></i></span><span class="ds">${x}<small> / ${mx}</small></span>${I("expand_more")}</button><div class="dom-why" hidden>${domWhy(d, j)}</div>`; }).join("")}</div>`;
+  const missed = (j.red_flags || []).filter(x => !x.checked);
+  if (missed.length) h += `<div class="callout">${I("report", 1)}<div><b>놓치면 위험한 것 ${missed.length}개를 확인하지 않았습니다</b><ul>${missed.map(x => `<li>${esc(x.item)}</li>`).join("")}</ul></div></div>`;
+  const ck = [...(j.checklist || [])], order = {"지어낸 기록":0, "미수집":1, "기록 누락":2, "정상":3};
+  ck.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
+  const tc = t => t === "정상" ? "g" : t === "지어낸 기록" ? "r" : "y";
+  if (ck.length) h += `<details class="acc"><summary>${I("checklist")}체크리스트<span class="meta">문제 ${ck.filter(c => c.tag && c.tag !== "정상").length} / ${ck.length}</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${ck.map(c => `<div class="ck"><div class="ck-main"><div class="ck-t">${esc(c.item)}</div>
+      <div class="ck-m"><span class="${c.asked ? "yes" : "no"}">${I(c.asked ? "check" : "close")}물음</span><span class="${c.recorded ? "yes" : "no"}">${I(c.recorded ? "check" : "close")}기록</span>${c.turn && c.turn !== "턴 없음" ? `<span>${esc(c.turn)}</span>` : ""}</div></div>${c.tag ? `<span class="chip sm ${tc(c.tag)}">${esc(c.tag)}</span>` : ""}</div>`).join("")}</div></details>`;
+  h += `<details class="acc"><summary>${I("person")}환자 평가<span class="meta">의사소통 ${sc["의사소통"] ?? 0} / 15</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">
+      <ul class="lst">${(pf.good || []).map(x => `<li><span class="g">${I("thumb_up")}</span><span>${esc(x)}</span></li>`).join("")}${(pf.regret || []).map(x => `<li><span class="r">${I("sentiment_dissatisfied")}</span><span>${esc(x)}</span></li>`).join("")}</ul>
+      ${pf.wish ? `<div class="quote">${esc(pf.wish)}</div>` : ""}
+      ${pf.ppi ? `<div class="ppi">${Object.entries(pf.ppi).map(([k, x]) => `<div>${esc(k)}${(pf.ppi_turn || {})[k] ? ` <span class="meta" style="font-size:13px">${esc(pf.ppi_turn[k])}</span>` : ""}</div><span class="meter">${[1,2,3].map(i => `<i class="${+x >= i ? "on" : ""}"></i>`).join("")}</span>`).join("")}</div>` : ""}
+    </div></details>`;
+  h += `<details class="acc"><summary>${I("menu_book")}모범 답안<span class="meta">검사 전 기준 · 검수 전 초안</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${refHTML(v.reference)}</div></details>`;
+  h += `<p class="foot-meta">${(v.submits || []).length > 1 ? `${v.submits.length}번째 채점 (이전 ${v.submits.slice(0, -1).map(x => x.total).join(", ")}점) · ` : ""}모델 ${u.calls || 0}회 · ${((u.in || 0) + (u.out || 0)).toLocaleString()} 토큰</p></div>`;
+  body().innerHTML = h;
+  $$("#cvBody .dom").forEach(b => b.onclick = () => { const w = b.nextElementSibling, o = w.hidden; w.hidden = !o; b.setAttribute("aria-expanded", o); });
+}
+function domWhy(d, j){
+  const sb = (j.sub || {})[d], why = (j.reasons || {})[d];
+  const parts = sb ? Object.entries(sb).map(([k, x]) => `${esc(k)} ${esc(x)}`).join(" · ") : d === "의사소통" ? "환자 설문 8항목 평균 × 5" : "";
+  return `${parts ? `<div class="sub">${parts}</div>` : ""}${why ? esc(why) : d === "의사소통" ? "아래 '환자 평가'에서 항목별 점수를 볼 수 있습니다." : ""}`;
+}
+function refHTML(r){
+  if (!r) return `<p class="meta">없음</p>`;
+  const ul = a => a && a.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+  let h = `<div class="ref">`;
+  if (r.S) h += `<h4>S</h4>${ul(r.S)}`;
+  if (r.O) h += `<h4>O</h4>${ul(r.O)}`;
+  if (r.A) h += `<h4>A · ${esc(r.A.main || "")}</h4>${ul(r.A.rationale)}${(r.A.ddx || []).length ? `<ul>${r.A.ddx.map(x => `<li><b>감별 ${esc(x.dx)}</b> — ${esc(x.why)}</li>`).join("")}</ul>` : ""}`;
+  if (r.P) h += `<h4>P</h4><ul>${[["tests","검사"],["treatment","처치"],["safety","안전"],["followup","추적"]].flatMap(([k, l]) => (r.P[k] || []).map(x => `<li><b>${l}</b> ${esc(x)}</li>`)).join("")}</ul>`;
+  if (r.red_flags) h += `<h4>놓치면 위험한 것</h4>${ul(r.red_flags)}`;
+  if (r.communication) h += `<h4>설명·공감</h4>${ul(r.communication)}`;
+  return h + `</div>`;
+}
+function editMeta(v){
+  const meta = v.meta || {};
+  dialog({title:"제목·메모", body:`<div class="fld"><label>제목</label><input class="inp" id="mT" value="${esc(meta.title || "")}" placeholder="${esc(fmtWhen(v.name))} 진료"></div>
+    <div class="fld"><label>메모</label><textarea class="inp" id="mM" rows="4" placeholder="잘한 점, 다음에 고칠 점">${esc(meta.memo || "")}</textarea></div>`,
+    actions:[{label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
+      try {
+        const r = await api("/api/record/update", {name:v.name, title:$("#mT", el).value, memo:$("#mM", el).value});
+        close(null); toast("저장했습니다"); v.meta = r.meta; await refreshSide();
+        if (CV === v) $("#cvSub").textContent = `${caseOf(v.case) ? `환자 ${caseOf(v.case).no} · ` : ""}${v.patient?.cc || ""} · ${v.mode || ""}${v.meta?.title ? " · " + v.meta.title : ""}`;
+      } catch(e){ fail(e); }
+    }}]});
+}
+
+/* ───── 증례 관리 ───── */
+const shortStatus = s => /완료/.test(s || "") ? "검수 완료" : /검수 중/.test(s || "") ? "검수 중" : /작성/.test(s || "") ? "작성 중" : "검수 전";
+async function loadAdmin(){
+  const j = await api("/api/admin/cases");
+  $("#v-admin").innerHTML = `<div class="page-head"><div class="ph-main"><h1>증례 관리</h1><div class="meta">${j.rows.length}개 · 정답이 보이는 화면입니다</div></div>
+      <div class="ph-act"><button class="btn filled" id="newCase">${I("add")}<span class="t">새 증례</span></button></div></div>
+    <div class="card list">${j.rows.map(r => `<div class="case-row" data-c="${esc(r.cid)}"><span class="num">${r.no}</span>
+      <div class="cr-main"><div class="cr-t">${esc(r.cc)} <span class="meta" style="font-weight:400">· ${esc(r.who)}</span></div><div class="cr-m">정답 · ${esc(r.truth)}</div></div>
+      <span class="chip sm ${/완료/.test(r.status || "") ? "g" : "y"} hide-xs">${shortStatus(r.status)}</span>
+      <button class="iconbtn" data-more="${esc(r.cid)}" title="더 보기">${I("more_vert")}</button></div>`).join("") || `<div class="side-empty">증례가 없습니다</div>`}</div>`;
+  $$("#v-admin .case-row").forEach(row => row.onclick = e => { if (!e.target.closest("[data-more]")) go("#edit/" + row.dataset.c); });
+  $$("#v-admin [data-more]").forEach(b => b.onclick = e => { e.stopPropagation(); const cid = b.dataset.more; menu(b, [
+    {icon:"edit", label:"편집", onClick: () => go("#edit/" + cid)},
+    {icon:"delete", label:"삭제", danger:true, onClick: async () => {
+      if (!await ask(`증례 ${cid} 삭제`, "cases/_trash 로 옮깁니다. 이 증례로 한 진료 기록은 남습니다.", "삭제", true)) return;
+      try { await api("/api/admin/case/delete", {cid}); toast("증례를 휴지통으로 옮겼습니다"); await loadCases(); loadAdmin(); } catch(e){ fail(e); }
+    }}]); });
+  $("#newCase").onclick = e => menu(e.currentTarget, [
+    {icon:"article", label:"PMC 논문으로 만들기", onClick: newFromPmc},
+    {icon:"edit_note", label:"빈 양식으로 만들기", onClick: async () => {
+      const truth = await askText("빈 양식으로 새 증례", "정답 (최종 진단)", "예) 급성 간헐성 포르피린증 (E80.2)");
+      if (!truth) return;
+      try { const c = await api("/api/admin/case/create", {truth}); openEditor(c.case_id, c); } catch(e){ fail(e); }
+    }}]);
+  show("admin");
+}
+function newFromPmc(){
+  dialog({title:"PMC 논문으로 새 증례", body:`<p class="dlg-msg" style="margin-bottom:16px">원문을 받아 대본·진찰·검사·모범 답안을 만듭니다. 1~3분 걸리고, 만든 뒤 검수가 필요합니다.</p>
+    <div class="fld"><label>PMC 번호</label><input class="inp" id="pmcId" placeholder="예) PMC11512492"></div>
+    <div class="fld"><label>정답 (최종 진단)</label><input class="inp" id="pmcTruth" placeholder="예) 급성 간헐성 포르피린증 (E80.2)"></div>
+    <div class="fld"><label>한 줄 소개 <span class="hint">선택</span></label><input class="inp" id="pmcIntro"></div>`,
+    actions:[{label:"취소", value:null}, {label:"만들기", kind:"filled", onClick: async (close, el) => {
+      const pmcid = $("#pmcId", el).value.trim(), truth = $("#pmcTruth", el).value.trim(), intro = $("#pmcIntro", el).value.trim();
+      if (!pmcid || !truth) { toast("PMC 번호와 정답을 적어 주세요", true); return; }
+      close(null); setBusy(true, "원문을 받아 증례를 만드는 중 (1~3분)");
+      try { const c = await api("/api/admin/case/create", {pmcid, truth, intro}); await loadCases(); openEditor(c.case_id, c); }
+      catch(e){ fail(e); } finally { setBusy(false); }
+    }}]});
+}
+
+/* 편집기: 증례 JSON 을 탭별 양식으로 고친다 */
+let ED = null, EDcid = null, edDirty = false, edTab = "basic";
+const ED_TABS = [["basic","기본"], ["script","대본·연기"], ["exam","진찰·검사"], ["check","체크리스트"], ["ref","모범 답안"]];
+const getP = (o, path) => path.split(".").reduce((a, k) => a == null ? a : a[k], o);
+function setP(o, path, val){ const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks.at(-1)] = val; }
+const F = {
+  text: (label, path, ph) => `<div class="fld"><label>${label}</label><input class="inp" data-p="${path}" data-k="text" value="${esc(getP(ED, path) ?? "")}" placeholder="${esc(ph || "")}"></div>`,
+  area: (label, path, ph) => `<div class="fld"><label>${label}</label><textarea class="inp" data-p="${path}" data-k="text" placeholder="${esc(ph || "")}">${esc(getP(ED, path) ?? "")}</textarea></div>`,
+  lines: (label, path) => `<div class="fld"><label>${label} <span class="hint">한 줄에 하나</span></label><textarea class="inp" data-p="${path}" data-k="lines">${esc((getP(ED, path) || []).join("\n"))}</textarea></div>`,
+  sel: (label, path, opts) => `<div class="fld"><label>${label}</label><select class="inp" data-p="${path}" data-k="text">${opts.map(o => `<option ${String(getP(ED, path)) === String(o) ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`,
+  rows: (label, path, cols) => {
+    const arr = getP(ED, path) || [], tpl = cols.map(c => c.w || "1fr").join(" ") + " 40px";
+    return (arr.length ? `<div class="rows-h" style="grid-template-columns:${tpl}">${cols.map(c => `<span>${esc(c.h)}</span>`).join("")}<span></span></div>` : "") +
+      arr.map((r, i) => `<div class="erow" style="grid-template-columns:${tpl}">` + cols.map(c => {
+        const p = `${path}.${i}.${c.k}`, v = r[c.k] ?? "";
+        if (c.opts) return `<select class="inp" data-p="${p}" data-k="${c.num ? "num" : "text"}">${c.opts.map(o => `<option ${String(v) === String(o) ? "selected" : ""}>${o}</option>`).join("")}</select>`;
+        return c.long ? `<textarea class="inp" data-p="${p}" data-k="text" placeholder="${esc(c.h)}">${esc(v)}</textarea>` : `<input class="inp" data-p="${p}" data-k="text" value="${esc(v)}" placeholder="${esc(c.h)}">`;
+      }).join("") + `<button class="iconbtn" data-del="${path}" data-i="${i}" title="이 줄 지우기">${I("delete")}</button></div>`).join("") +
+      `<button class="btn text" data-add="${path}">${I("add")}${label} 추가</button>`;
+  },
+};
+function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = "basic"; go("#edit/" + cid); }
+async function openEditorRoute(cid){
+  if (!(ED && EDcid === cid)) { ED = await api("/api/admin/case?cid=" + encodeURIComponent(cid)); EDcid = cid; edDirty = false; edTab = "basic"; }
+  show("edit"); renderEditor();
+}
+function renderEditor(){
+  const sc = ED.script || (ED.script = {});
+  const scKeys = [...new Set(["현병력","동반증상","없는증상","과거력","약","알레르기","가족력","사회력","여성력","이전진료", ...Object.keys(sc)])];
+  ED.acting = ED.acting || {}; ED.reference = ED.reference || {}; ED.reference.A = ED.reference.A || {}; ED.reference.P = ED.reference.P || {};
+  let b = "";
+  if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
+    <div class="card pad ed"><h3>환자 <small>진료 시작 때 보이는 것</small></h3><div class="g2">${F.text("이름", "patient.name")}${F.text("나이", "patient.age")}${F.sel("성별", "patient.sex", ["여", "남"])}${F.text("주호소", "patient.chief_complaint")}</div>
+      ${F.area("첫마디 (이름·나이·주호소만)", "patient.opening")}${F.area("활력징후", "vitals")}</div>`;
+  else if (edTab === "script") b = `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
+    <div class="card pad ed"><h3>연기</h3><div class="g2">${F.area("성격·말투", "acting.성격·말투")}${F.area("감정", "acting.감정")}${F.lines("걱정", "acting.걱정")}${F.lines("기대", "acting.기대")}</div></div>`;
+  else if (edTab === "exam") b = `<div class="card pad ed"><h3>진찰 소견 <small>목록에 없는 진찰은 '특이 소견 없음'</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}])}</div>
+    <div class="card pad ed"><h3>검사 결과 <small>본선에서만</small></h3>${F.rows("검사", "tests", [{k:"name", h:"검사 이름", w:"1fr"}, {k:"result", h:"결과", w:"2fr", long:true}])}</div>`;
+  else if (edTab === "check") b = `<div class="card pad ed"><h3>체크리스트 <small>한 줄에 한 가지</small></h3>${F.rows("항목", "checklist", [{k:"item", h:"확인할 항목", w:"2fr"}, {k:"type", h:"종류", w:"100px", opts:["SAY", "EXAM"]}, {k:"weight", h:"가중치", w:"80px", opts:[1, 2, 3], num:true}, {k:"why", h:"이유", w:"2fr"}])}</div>`;
+  else b = `<div class="card pad ed"><h3>모범 답안 <small>검사 전, 대화·진찰만 한 시점</small></h3><div class="g2">${F.lines("S", "reference.S")}${F.lines("O", "reference.O")}</div>
+      ${F.text("A · 주진단", "reference.A.main")}${F.lines("A · 근거", "reference.A.rationale")}
+      <div class="fld"><label>A · 감별진단</label></div>${F.rows("감별진단", "reference.A.ddx", [{k:"dx", h:"감별진단", w:"1fr"}, {k:"why", h:"고려 이유·배제 근거", w:"2fr", long:true}])}</div>
+    <div class="card pad ed"><div class="g2">${F.lines("P · 검사", "reference.P.tests")}${F.lines("P · 처치", "reference.P.treatment")}${F.lines("P · 안전", "reference.P.safety")}${F.lines("P · 추적", "reference.P.followup")}
+      ${F.lines("놓치면 위험한 것", "reference.red_flags")}${F.lines("설명·공감", "reference.communication")}</div></div>`;
+  $("#v-edit").innerHTML = `<div class="page-head"><button class="iconbtn" id="edBack" title="증례 목록">${I("arrow_back")}</button>
+      <div class="ph-main"><h1>증례 ${esc(EDcid)}</h1><div class="meta">${esc(ED.patient?.chief_complaint || "")}${ED.truth ? " · " + esc(ED.truth) : ""}</div></div>
+      <div class="ph-act">${ED._unsaved ? `<span class="chip sm y">저장 전</span>` : ""}<button class="iconbtn" id="edJson" title="JSON으로 보기·고치기">${I("data_object")}</button><button class="btn filled" id="edSave">${I("save")}<span class="t">저장</span></button></div></div>
+    <div class="tabs">${ED_TABS.map(([k, l]) => `<button class="tab${edTab === k ? " on" : ""}" data-et="${k}">${l}</button>`).join("")}</div>${b}`;
+  const grow = t => { t.style.height = "auto"; t.style.height = (t.scrollHeight + 2) + "px"; };
+  $$("#v-edit textarea").forEach(t => { grow(t); t.addEventListener("input", () => grow(t)); });
+  $$("#v-edit [data-p]").forEach(el => el.addEventListener("input", () => {
+    const k = el.dataset.k, v = el.value; edDirty = true;
+    setP(ED, el.dataset.p, k === "lines" ? v.split("\n").map(x => x.trim()).filter(Boolean) : k === "num" ? +v : v);
+  }));
+  $$("#v-edit [data-et]").forEach(x => x.onclick = () => { edTab = x.dataset.et; renderEditor(); });
+  $$("#v-edit [data-add]").forEach(x => x.onclick = () => { const a = getP(ED, x.dataset.add) || []; a.push({}); setP(ED, x.dataset.add, a); edDirty = true; renderEditor(); });
+  $$("#v-edit [data-del]").forEach(x => x.onclick = () => { const a = getP(ED, x.dataset.del) || []; a.splice(+x.dataset.i, 1); edDirty = true; renderEditor(); });
+  $("#edBack").onclick = () => go("#admin");
+  $("#edSave").onclick = saveCase;
+  $("#edJson").onclick = () => {
+    const {_unsaved, ...clean} = ED;
+    dialog({title:`증례 ${EDcid} JSON`, cls:"wide", body:`<textarea class="inp" id="jsonTa" style="min-height:58dvh;font:13.5px/1.5 ui-monospace,Menlo,monospace">${esc(JSON.stringify(clean, null, 1))}</textarea>`,
+      actions:[{label:"닫기", value:null}, {label:"양식에 반영", kind:"filled", onClick:(close, el) => {
+        try { const u = ED._unsaved; ED = JSON.parse($("#jsonTa", el).value); if (u) ED._unsaved = true; edDirty = true; close(null); renderEditor(); toast("반영했습니다. 저장을 눌러야 파일에 씁니다"); }
+        catch(e){ toast("JSON 형식 오류: " + e.message, true); }
+      }}]});
+  };
+}
+async function saveCase(){
+  const {_unsaved, ...data} = ED;
+  try {
+    await api("/api/admin/case/save", {cid:EDcid, data});
+    delete ED._unsaved; edDirty = false; toast("저장했습니다 (이전 판은 보관)"); renderEditor();
+    await loadCases(); renderSide();
+  } catch(e){ fail(e); }
+}
+
+/* ───── 시작 ───── */
+async function init(){ try { await loadCases(); await refreshSide(); route(); } catch(e){ fail(e); } }
+(async () => {
+  try {
+    const a = await (await fetch(API + "/api/auth", {headers: TOKEN ? {Authorization:"Bearer " + TOKEN} : {}})).json();
+    $("#pwDays").textContent = a.days || 1;
+    if (!a.ok) { show("home"); askLogin(); return; }
+  } catch(e){ toast("서버에 연결하지 못했습니다", true); return; }
+  init();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+.env
+.env.*
+web/config.js
+__pycache__/
+*.pyc
+supabase/.temp/

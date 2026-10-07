@@ -1,0 +1,5 @@
+# Supabase CLI 설정 (배포에 필요한 것만)
+project_id = "cpx-sim"
+
+[functions.api]
+verify_jwt = false   # 함수가 자체 비밀번호 토큰으로 확인한다
