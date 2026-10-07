@@ -1231,6 +1231,7 @@ function cardHTML(c){
       <span>문답 ${(c.qa || []).length} ${chips(cnt(c.qa, "src"))}</span><span>진찰 ${(c.exam || []).length} ${chips(cnt(c.exam, "src"))}</span></div>
     <table class="cardt">${rows.map(([h, v]) => `<tr><th>${esc(h)}</th><td>${txt(v) ? esc(v) : '<span class="chip sm r">비어 있음</span>'}</td></tr>`).join("")}</table>
     ${(c.card_gaps || []).length ? `<h3 style="margin-top:18px">검수자가 정할 것</h3><ul class="lst">${c.card_gaps.map(g => `<li><span class="r">${I("rule")}</span><span>${esc(g)}</span></li>`).join("")}</ul>` : ""}
+    ${(c.beliefs || []).length ? `<h3 style="margin-top:18px">환자가 잘못 알거나 모르는 것</h3><ul class="lst">${c.beliefs.map(x => `<li><span>${I("help")}</span><span>${esc(x.belief || "")} <span class="chip sm">${esc(x.kind || "짐작")}</span><br><span style="color:var(--on3);font-size:14px">실제: ${esc(x.truth || "")} · 확인: ${esc(x.check || "")}</span></span></li>`).join("")}</ul>` : ""}
     ${(c.qa_sources || []).length ? `<h3 style="margin-top:18px">보강 출처</h3><ul class="lst">${c.qa_sources.map(x => `<li><span>${I("article")}</span><span>${esc(x.id || "")} <a href="${esc(x.url || "#")}" target="_blank" rel="noopener">${esc(x.title || x.url || "")}</a></span></li>`).join("")}</ul>` : ""}</div>`;
 }
 function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = data._unsaved ? "basic" : "card"; go("#edit/" + cid); }
@@ -1249,6 +1250,7 @@ function renderEditor(){
       ${F.area("첫마디 (이름·나이·주호소만)", "patient.opening")}${F.area("활력징후", "vitals")}</div>`;
   else if (edTab === "script") b = `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
     <div class="card pad ed"><h3>자주 묻는 것 <small>의사가 물으면 이대로 대답 · 출처는 검수용</small></h3>${F.rows("문답", "qa", [{k:"q", h:"질문 요지", w:"1fr"}, {k:"a", h:"환자 대답", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "음성"]}, {k:"why", h:"근거", w:"1.2fr", long:true}])}</div>
+    <div class="card pad ed"><h3>잘못 알거나 모르는 것 <small>환자는 생각만 알고, 채점은 실제·확인 방법까지 봄</small></h3>${F.rows("항목", "beliefs", [{k:"belief", h:"환자 생각", w:"1.4fr", long:true}, {k:"kind", h:"종류", w:"92px", opts:["짐작", "들은 말"]}, {k:"truth", h:"실제", w:"1.6fr", long:true}, {k:"check", h:"확인 방법", w:"1.2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강"]}])}</div>
     <div class="card pad ed"><h3>연기</h3><div class="g2">${F.area("성격·말투", "acting.성격·말투")}${F.area("감정", "acting.감정")}${F.lines("걱정", "acting.걱정")}${F.lines("기대", "acting.기대")}</div></div>`;
   else if (edTab === "exam") b = `<div class="card pad ed"><h3>진찰 소견 <small>목록에 없는 진찰은 '특이 소견 없음'</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "정상"]}])}</div>
     <div class="card pad ed"><h3>검사 결과 <small>본선에서만</small></h3>${F.rows("검사", "tests", [{k:"name", h:"검사 이름", w:"1fr"}, {k:"result", h:"결과", w:"2fr", long:true}])}</div>`;

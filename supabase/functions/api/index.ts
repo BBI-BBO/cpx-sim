@@ -292,16 +292,30 @@ function reject(R: any, act: string, text: string, why: string) {
   R.events.push({ type: "reject", act, text, why, time: kst() });
   return { ok: false, out: `반려: ${why} (턴 차감 없음)` };
 }
+// 감정으로 맺는 버릇 줄이기: 최근 대답 셋 중 하나라도 감정으로 끝났으면 이번엔 감정 말을 빼라고 덧붙인다 (sp_sim.emo_hint 와 같음)
+function lastSentence(s: string) {
+  const parts = (s || "").trim().split(/(?<=[.?!…])\s+/).filter((x) => x.trim());
+  return parts.length ? parts[parts.length - 1] : "";
+}
+function emoHint(prevOuts: string[], text: string) {
+  if (new RegExp(P.EMO_ASK).test(text || "")) return "";
+  return prevOuts.slice(-3).some((o) => new RegExp(P.EMO_END).test(lastSentence(o))) ? P.EMO_HINT : "";
+}
 async function patientReply(R: any, C: any, text: string, U: Usage) {
   const p = C.patient || {};
   const qa = (C.qa || []).filter((x: any) => x?.q && x?.a).map((x: any) => `- ${x.q}: ${x.a}`).join("\n") || "(없음)";  // 출처·근거는 검수용, 환자에게 안 줌
   const persona = bullets(C.persona || {}) || bullets(C.acting || {}) || "(없음)";  // 자세한 페르소나, 없으면 예전 '연기' 칸
-  const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, persona, script: bullets(C.script || {}), qa });
+  // 환자가 잘못 알거나 모르는 것: 환자에게는 생각만 준다 (실제·확인 방법은 채점용)
+  const beliefs = (C.beliefs || []).filter((x: any) => x?.belief).map((x: any) => `- (${x.kind || "짐작"}) ${x.belief}`).join("\n") || "(없음)";
+  const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, persona, script: bullets(C.script || {}), qa, beliefs });
   const msgs: any[] = [{ role: "system", content: sys }, { role: "user", content: "(진료 시작)" }, { role: "assistant", content: p.opening || "" }];
-  for (const e of turnsOf(R).slice(-20)) {
+  const turns = turnsOf(R);
+  for (const e of turns.slice(-20)) {
     if (e.act === "SAY") msgs.push({ role: "user", content: e.text }, { role: "assistant", content: e.out });
     else msgs.push({ role: "user", content: `(${e.act}: ${e.text})` }, { role: "assistant", content: "네." });
   }
+  const hint = emoHint(turns.filter((e: any) => e.act === "SAY").map((e: any) => e.out), text);
+  if (hint) msgs.push({ role: "system", content: hint });
   msgs.push({ role: "user", content: text });
   const out = await chat("patient", msgs, false, 2000, U);
   return out.replace(new RegExp(`^\\s*(환자|${escRe(String(p.name))})\\s*[:：]\\s*`), "").trim().replace(/^["“”]+|["“”]+$/g, "");
@@ -352,6 +366,7 @@ async function submit(R: any, C: any, soap: Record<string, string>, dx: string, 
   const numbered = [..."SOAP"].flatMap((k) => split[k].map((x, i) => `[${k}${i + 1}] ${x}`)).join("\n") || "(비어 있음)";
   const user = `[정답(최종 확진)] ${C.truth}\n[모범 답안: 검사 전(SAY+EXAM) 기준 초진 기록]\n${JSON.stringify(C.reference || {}, null, 1)}\n` +
     `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(C.exam || [])}\n` +
+    `[환자가 잘못 알거나 모르는 것]\n${JSON.stringify(C.beliefs || [])}\n` +
     `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n` +
     `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
   const p = C.patient || {}, acting = { ...(C.acting || {}), ...(C.persona || {}) };
