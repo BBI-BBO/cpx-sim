@@ -294,7 +294,9 @@ function reject(R: any, act: string, text: string, why: string) {
 }
 async function patientReply(R: any, C: any, text: string, U: Usage) {
   const p = C.patient || {};
-  const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, script: bullets(C.script || {}), acting: bullets(C.acting || {}) });
+  const qa = (C.qa || []).filter((x: any) => x?.q && x?.a).map((x: any) => `- ${x.q}: ${x.a}`).join("\n") || "(없음)";  // 출처·근거는 검수용, 환자에게 안 줌
+  const persona = bullets(C.persona || {}) || bullets(C.acting || {}) || "(없음)";  // 자세한 페르소나, 없으면 예전 '연기' 칸
+  const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, persona, script: bullets(C.script || {}), qa });
   const msgs: any[] = [{ role: "system", content: sys }, { role: "user", content: "(진료 시작)" }, { role: "assistant", content: p.opening || "" }];
   for (const e of turnsOf(R).slice(-20)) {
     if (e.act === "SAY") msgs.push({ role: "user", content: e.text }, { role: "assistant", content: e.out });
@@ -352,7 +354,7 @@ async function submit(R: any, C: any, soap: Record<string, string>, dx: string, 
     `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(C.exam || [])}\n` +
     `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n` +
     `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
-  const p = C.patient || {}, acting = C.acting || {};
+  const p = C.patient || {}, acting = { ...(C.acting || {}), ...(C.persona || {}) };
   const prevPatient = rescore && subs.length ? subs.at(-1).patient : null;  // 대화는 그대로이므로 환자 설문은 처음 것을 쓴다
   const [j, pf] = await Promise.all([
     cjson("judge", [{ role: "system", content: P.JUDGE_SYS }, { role: "user", content: user }], 12000, U),

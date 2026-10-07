@@ -1,6 +1,7 @@
 """로컬 판(results/sp_sim)의 증례와 진료 기록을 Supabase 판 DB 로 옮긴다. 다시 돌려도 같은 이름은 덮어써서 안전하다.
 
   .venv/bin/python cpx-sim/scripts/import_local.py https://<프로젝트>.supabase.co/functions/v1
+  .venv/bin/python cpx-sim/scripts/import_local.py https://<프로젝트>.supabase.co/functions/v1 --cases-only   # 증례만
 
 비밀번호는 ../.env 의 SP_WEB_PASSWORD 를 쓴다. 정답이 든 증례는 저장소(GitHub)가 아니라 DB 로만 간다.
 """
@@ -65,11 +66,13 @@ def enc_row(path, cases):
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
-    api = sys.argv[1].rstrip("/")
+    api = [x for x in sys.argv[1:] if not x.startswith("--")][0].rstrip("/")
     tok = call(api, "/api/login", {"password": env("SP_WEB_PASSWORD")}).get("token")
     cases = {cid: sim.load_case(cid) for cid in sim.case_ids()}
     r = call(api, "/api/admin/import", {"cases": [{"cid": k, "data": v} for k, v in cases.items()]}, tok)
     print("증례", r.get("cases"), "개:", " ".join(cases))
+    if "--cases-only" in sys.argv:  # 증례만 (배포판의 진료 기록은 건드리지 않음)
+        return
     paths = sorted(glob.glob(os.path.join(sim.LOGDIR, "*.jsonl")))
     rows = [enc_row(p, cases) for p in paths]
     for i in range(0, len(rows), 3):

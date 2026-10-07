@@ -6,7 +6,7 @@
 <title>CPX 가상 환자</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,playlist_add,refresh,remove,report,save,schedule,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,playlist_add,refresh,remove,report,rule,save,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
 <script src="config.js"></script>
 <script>window.SP_CONFIG = window.SP_CONFIG || {api: ""};  /* GitHub Pages 판: api 에 Supabase 함수 주소 */</script>
 <style>
@@ -343,6 +343,9 @@ mark.hl.bad:hover,mark.hl.bad.act{background:color-mix(in srgb,var(--bad) 30%,tr
 .tab.on{color:var(--pri)}
 .tab.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--pri)}
 .ed{margin-bottom:14px}
+.cardt{border-collapse:collapse;width:100%;font-size:15px}
+.cardt th{width:92px;background:var(--s1);color:var(--on2);font-weight:700;text-align:center;padding:9px 10px;border:1px solid var(--line);vertical-align:middle}
+.cardt td{padding:9px 12px;border:1px solid var(--line);white-space:pre-wrap;line-height:1.6}
 .ed .g2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 14px}
 .ed h3{display:flex;align-items:baseline;gap:8px}
 .ed h3 small{font-weight:400;font-size:14px;color:var(--on3)}
@@ -1194,7 +1197,7 @@ function newFromPmc(){
 
 /* 편집기: 증례 JSON 을 탭별 양식으로 고친다 */
 let ED = null, EDcid = null, edDirty = false, edTab = "basic";
-const ED_TABS = [["basic","기본"], ["script","대본·연기"], ["exam","진찰·검사"], ["check","체크리스트"], ["ref","모범 답안"]];
+const ED_TABS = [["card","증례 카드"], ["basic","기본"], ["script","대본·문답·연기"], ["exam","진찰·검사"], ["check","체크리스트"], ["ref","모범 답안"]];
 const getP = (o, path) => path.split(".").reduce((a, k) => a == null ? a : a[k], o);
 function setP(o, path, val){ const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks.at(-1)] = val; }
 const F = {
@@ -1213,9 +1216,26 @@ const F = {
       `<button class="btn text" data-add="${path}">${I("add")}${label} 추가</button>`;
   },
 };
-function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = "basic"; go("#edit/" + cid); }
+/* 증례 카드: 표준화 환자 증례 카드 형식(성별/나이·주소·OLDCoExC·A·F·E·외·과·약·사·가·여·P/E·질문·특이 사항)으로 보고 빈칸 점검 */
+function cardHTML(c){
+  const k = c.card || {}, p = c.patient || {};
+  const txt = v => v == null ? "" : String(v).trim();
+  const A = (k.A || []).map(g => `[${g["계통"] || ""}] ` + (g.items || []).map(i => `${i.k}(${i.v || ""}${i.note ? ", " + i.note : ""})`).join(" · ")).join("\n");
+  const rows = [["성별/나이", k["성별/나이"] || (p.age ? `${sexW(p.sex)}/${p.age}세` : "")], ["주소", k["주소"] || p.opening], ["O", k.O], ["L", k.L], ["D", k.D], ["Co", k.Co], ["Ex", k.Ex], ["C", k.C],
+    ["A", A], ["F", k.F ? `악화: ${k.F["악화"] || "-"}\n완화: ${k.F["완화"] || "-"}` : ""], ["E", k.E], ["외", k["외"]], ["과", k["과"]], ["약", k["약"]], ["사", k["사"]], ["가", k["가"]],
+    ...(p.sex === "남" ? [] : [["여", k["여"]]]), ["P/E", (k.PE || []).map(x => `${x["부위"]}: ${x["소견"]}`).join("\n")], ["질문", k["질문"]], ["특이 사항", k["특이사항"]]];
+  const empty = rows.filter(r => !txt(r[1])).map(r => r[0]);
+  const cnt = (arr, key) => (arr || []).reduce((m, x) => (m[x[key] || "미표시"] = (m[x[key] || "미표시"] || 0) + 1, m), {});
+  const chips = o => Object.entries(o).map(([k2, n]) => `<span class="chip sm ${k2 === "보강" ? "y" : k2 === "원문" ? "g" : ""}">${esc(k2)} ${n}</span>`).join(" ");
+  return `<div class="card pad ed"><div class="hl-legend" style="margin-bottom:10px">${empty.length ? `<span class="chip sm r">빈 칸 ${empty.length}: ${esc(empty.join(", "))}</span>` : `<span class="chip sm g">빈 칸 없음</span>`}
+      <span>문답 ${(c.qa || []).length} ${chips(cnt(c.qa, "src"))}</span><span>진찰 ${(c.exam || []).length} ${chips(cnt(c.exam, "src"))}</span></div>
+    <table class="cardt">${rows.map(([h, v]) => `<tr><th>${esc(h)}</th><td>${txt(v) ? esc(v) : '<span class="chip sm r">비어 있음</span>'}</td></tr>`).join("")}</table>
+    ${(c.card_gaps || []).length ? `<h3 style="margin-top:18px">검수자가 정할 것</h3><ul class="lst">${c.card_gaps.map(g => `<li><span class="r">${I("rule")}</span><span>${esc(g)}</span></li>`).join("")}</ul>` : ""}
+    ${(c.qa_sources || []).length ? `<h3 style="margin-top:18px">보강 출처</h3><ul class="lst">${c.qa_sources.map(x => `<li><span>${I("article")}</span><span>${esc(x.id || "")} <a href="${esc(x.url || "#")}" target="_blank" rel="noopener">${esc(x.title || x.url || "")}</a></span></li>`).join("")}</ul>` : ""}</div>`;
+}
+function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = data._unsaved ? "basic" : "card"; go("#edit/" + cid); }
 async function openEditorRoute(cid){
-  if (!(ED && EDcid === cid)) { ED = await api("/api/admin/case?cid=" + encodeURIComponent(cid)); EDcid = cid; edDirty = false; edTab = "basic"; }
+  if (!(ED && EDcid === cid)) { ED = await api("/api/admin/case?cid=" + encodeURIComponent(cid)); EDcid = cid; edDirty = false; edTab = "card"; }
   show("edit"); renderEditor();
 }
 function renderEditor(){
@@ -1223,12 +1243,14 @@ function renderEditor(){
   const scKeys = [...new Set(["현병력","동반증상","없는증상","과거력","약","알레르기","가족력","사회력","여성력","이전진료", ...Object.keys(sc)])];
   ED.acting = ED.acting || {}; ED.reference = ED.reference || {}; ED.reference.A = ED.reference.A || {}; ED.reference.P = ED.reference.P || {};
   let b = "";
-  if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
+  if (edTab === "card") b = cardHTML(ED);
+  else if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
     <div class="card pad ed"><h3>환자 <small>진료 시작 때 보이는 것</small></h3><div class="g2">${F.text("이름", "patient.name")}${F.text("나이", "patient.age")}${F.sel("성별", "patient.sex", ["여", "남"])}${F.text("주호소", "patient.chief_complaint")}</div>
       ${F.area("첫마디 (이름·나이·주호소만)", "patient.opening")}${F.area("활력징후", "vitals")}</div>`;
   else if (edTab === "script") b = `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
+    <div class="card pad ed"><h3>자주 묻는 것 <small>의사가 물으면 이대로 대답 · 출처는 검수용</small></h3>${F.rows("문답", "qa", [{k:"q", h:"질문 요지", w:"1fr"}, {k:"a", h:"환자 대답", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "음성"]}, {k:"why", h:"근거", w:"1.2fr", long:true}])}</div>
     <div class="card pad ed"><h3>연기</h3><div class="g2">${F.area("성격·말투", "acting.성격·말투")}${F.area("감정", "acting.감정")}${F.lines("걱정", "acting.걱정")}${F.lines("기대", "acting.기대")}</div></div>`;
-  else if (edTab === "exam") b = `<div class="card pad ed"><h3>진찰 소견 <small>목록에 없는 진찰은 '특이 소견 없음'</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}])}</div>
+  else if (edTab === "exam") b = `<div class="card pad ed"><h3>진찰 소견 <small>목록에 없는 진찰은 '특이 소견 없음'</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "정상"]}])}</div>
     <div class="card pad ed"><h3>검사 결과 <small>본선에서만</small></h3>${F.rows("검사", "tests", [{k:"name", h:"검사 이름", w:"1fr"}, {k:"result", h:"결과", w:"2fr", long:true}])}</div>`;
   else if (edTab === "check") b = `<div class="card pad ed"><h3>체크리스트 <small>한 줄에 한 가지</small></h3>${F.rows("항목", "checklist", [{k:"item", h:"확인할 항목", w:"2fr"}, {k:"type", h:"종류", w:"100px", opts:["SAY", "EXAM"]}, {k:"weight", h:"가중치", w:"80px", opts:[1, 2, 3], num:true}, {k:"why", h:"이유", w:"2fr"}])}</div>`;
   else b = `<div class="card pad ed"><h3>모범 답안 <small>검사 전, 대화·진찰만 한 시점</small></h3><div class="g2">${F.lines("S", "reference.S")}${F.lines("O", "reference.O")}</div>
