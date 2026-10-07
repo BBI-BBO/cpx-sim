@@ -6,7 +6,12 @@ import * as P from "./prompts.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const OPENAI_KEY = env("SP_OPENAI_API_KEY"), PASSWORD = env("SP_WEB_PASSWORD");
-const SB_URL = env("SUPABASE_URL"), SB_KEY = env("SUPABASE_SERVICE_ROLE_KEY") || env("SUPABASE_SECRET_KEY");
+const SB_URL = env("SUPABASE_URL");
+// 서비스 키: 예전 방식(JWT) 또는 새 방식(sb_secret_…, SUPABASE_SECRET_KEYS 는 {"이름": "키"} JSON)
+const SB_KEY = env("SUPABASE_SERVICE_ROLE_KEY") || (() => {
+  try { return Object.values(JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}"))[0] as string || ""; } catch { return ""; }
+})() || env("SUPABASE_SECRET_KEY");
+const SB_HEAD: Record<string, string> = SB_KEY.startsWith("sb_") ? { apikey: SB_KEY } : { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 const MAX_MIN = Number(env("SP_MAX_MIN") || 0);       // 0 = 시간 제한 없음 (대회는 20)
 const AUTH_DAYS = Number(env("SP_AUTH_DAYS") || 1);   // 한 번 들어오면 유지되는 날 수
 const MODELS: Record<string, string> = {
@@ -46,9 +51,10 @@ const GREET = new RegExp(P.GREET);
 
 // ───────────── DB (PostgREST, 서비스 키) ─────────────
 async function rest(method: string, path: string, body?: unknown, prefer = "return=representation"): Promise<any> {
+  if (!SB_KEY) throw new Error("함수 환경에 Supabase 서비스 키가 없습니다");
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method,
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: prefer },
+    headers: { ...SB_HEAD, "Content-Type": "application/json", Prefer: prefer },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const t = await r.text();
