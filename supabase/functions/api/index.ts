@@ -179,7 +179,7 @@ async function liveCases(): Promise<any[]> {
   return listMemo.rows;
 }
 const casesPayload = (rows: any[]) => ({
-  cases: rows.map((r: any, i: number) => ({ no: i + 1, cid: r.cid, age: r.data.patient?.age, sex: r.data.patient?.sex, cc: r.data.patient?.chief_complaint })),
+  cases: rows.map((r: any, i: number) => ({ no: i + 1, cid: r.cid, age: r.data.patient?.age, sex: r.data.patient?.sex, cc: r.data.patient?.chief_complaint, level: r.data.difficulty || "" })),
   max_turns: P.MAX_TURNS, max_min: MAX_MIN, maxlen: P.MAXLEN,
 });
 
@@ -541,7 +541,7 @@ async function handle(req: Request): Promise<Response> {
       const rows = await liveCases();
       return reply({ rows: rows.map((r: any, i: number) => {
         const c = r.data, p = c.patient || {}, d = new Date(new Date(r.updated_at).getTime() + 9 * 3600e3);
-        return { no: i + 1, cid: r.cid, who: `${p.age ?? ""}세 ${p.sex ?? ""}`, cc: p.chief_complaint, truth: c.truth, pmcid: c.pmcid, status: c.status || "",
+        return { no: i + 1, cid: r.cid, who: `${p.age ?? ""}세 ${p.sex ?? ""}`, cc: p.chief_complaint, truth: c.truth, pmcid: c.pmcid, status: c.status || "", level: c.difficulty || "",
           exam: (c.exam || []).length, tests: (c.tests || []).length, checklist: (c.checklist || []).length,
           updated: `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}` };
       }) });

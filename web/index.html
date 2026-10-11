@@ -70,6 +70,7 @@ button{font:inherit;color:inherit}
 .chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:4px;background:var(--s2);color:var(--on2);font-size:14px;font-weight:500;white-space:nowrap}
 .chip .ms{font-size:18px}
 .chip.sm{height:22px;padding:0 7px;font-size:12.5px}
+.chip.lv{margin-left:6px;vertical-align:1px}
 .chip.g{background:var(--ok-c);color:var(--ok)} .chip.y{background:var(--warn-c);color:var(--warn)} .chip.r{background:var(--bad-c);color:var(--bad)} .chip.p{background:var(--pri-c);color:var(--on-pri-c)}
 .inp{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--on);font:inherit;font-size:16px;line-height:1.55}
 .inp:focus{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 16%,transparent)}
@@ -704,10 +705,11 @@ $("#lblBtn").onclick = e => {
     st.map(x => `<button data-l="${esc(x.label)}" class="${LSEL === x.label ? "on" : ""}">${I("science")}<span class="mi-main">${esc(x.label)}<small>${statTxt(x)}${x.n > x.done ? ` · 진행 중 ${x.n - x.done}` : ""}</small></span></button>`).join(""), true);
   $$("button[data-l]", m).forEach(b => b.onclick = () => { closeMenu(); setLabel(b.dataset.l); });
 };
+const LEVELS = ["쉬움", "보통", "어려움"], lvChip = l => l ? `<span class="chip sm lv ${({"쉬움": "g", "보통": "y", "어려움": "r"})[l] || ""}">${esc(l)}</span>` : "";  // 난이도
 function renderPsel(){
   const c = caseOf(PSEL), n = c ? HIST.filter(r => r.case === c.cid).length : HIST.length;
   $("#pselBtn").innerHTML = c
-    ? `<span class="num pri">${c.no}</span><span class="psel-main"><span class="psel-t">${esc(c.cc)}</span><span class="psel-m">${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}</span></span>${I("unfold_more")}`
+    ? `<span class="num pri">${c.no}</span><span class="psel-main"><span class="psel-t">${esc(c.cc)}${lvChip(c.level)}</span><span class="psel-m">${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}</span></span>${I("unfold_more")}`
     : `<span class="num">${I("groups")}</span><span class="psel-main"><span class="psel-t">모든 환자</span><span class="psel-m">환자 ${CASES.length}명 · 진료 ${n}</span></span>${I("unfold_more")}`;
 }
 $("#pselBtn").onclick = e => {
@@ -715,7 +717,7 @@ $("#pselBtn").onclick = e => {
   const rows = q => [{cid:"all"}, ...CASES].filter(c => c.cid === "all" ? !q : `${c.no} ${c.cc} ${c.age}세 ${sexW(c.sex)}`.toLowerCase().includes(q)).map(c => {
     const n = HIST.filter(r => c.cid === "all" || r.case === c.cid).length, live = HIST.filter(r => r.live && (c.cid === "all" || r.case === c.cid)).length;
     return `<button data-c="${esc(c.cid)}" class="${PSEL === c.cid ? "on" : ""}">${c.cid === "all" ? `<span class="num">${I("groups")}</span>` : `<span class="num">${c.no}</span>`}
-      <span class="mi-main">${c.cid === "all" ? "모든 환자" : esc(c.cc)}<small>${c.cid === "all" ? `진료 ${n}` : `${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}`}</small></span>${live ? `<span class="live-badge"><i></i>${live}</span>` : ""}</button>`;
+      <span class="mi-main">${c.cid === "all" ? "모든 환자" : esc(c.cc) + lvChip(c.level)}<small>${c.cid === "all" ? `진료 ${n}` : `${esc(c.age)}세 ${esc(sexW(c.sex))} · 진료 ${n}`}</small></span>${live ? `<span class="live-badge"><i></i>${live}</span>` : ""}</button>`;
   }).join("") || `<div class="side-empty">찾는 환자가 없습니다</div>`;
   const m = popup(anchor, `${many ? `<div class="search">${I("search")}<input id="pq" placeholder="번호·주호소로 찾기" autocomplete="off"></div>` : ""}<div id="plist">${rows("")}</div>`, true);
   const wire = () => $$("#plist button", m).forEach(b => b.onclick = () => { closeMenu(); setPatient(b.dataset.c); });
@@ -777,7 +779,7 @@ function renderHome(){
   const c = caseOf(PSEL);
   $("#v-home").innerHTML = `<div class="empty">
     <div class="hero">${I("stethoscope", 1)}</div>
-    <h1>${c ? `환자 ${c.no} · ${esc(c.cc)}` : "진료를 시작해 보세요"}</h1>
+    <h1>${c ? `환자 ${c.no} · ${esc(c.cc)}${lvChip(c.level)}` : "진료를 시작해 보세요"}</h1>
     <p>${c ? `${esc(c.age)}세 ${esc(sexW(c.sex))}. 새 진료를 시작하거나 왼쪽에서 지난 진료를 고르세요.` : "왼쪽 위에서 환자를 고르면 그 환자의 진료 기록이 보입니다."}</p>
     <div class="row-btns"><button class="btn filled" id="homeNew">${I("add")}새 진료</button><button class="btn text" id="homeRules">${I("help")}진료 규칙</button></div>
   </div>`;
@@ -806,7 +808,7 @@ function openPicker(){
   const list = () => {
     const q = ($("#pkQ", d.el)?.value || "").trim().toLowerCase();
     $("#pkList", d.el).innerHTML = CASES.filter(c => !q || `${c.no} ${c.age}세 ${sexW(c.sex)} ${c.cc}`.toLowerCase().includes(q)).map(c =>
-      `<button class="pk${sel === c.cid ? " on" : ""}" data-c="${esc(c.cid)}"><span class="num">${c.no}</span><span class="pk-main"><span class="cc">${esc(c.cc)}</span><span class="who">${esc(c.age)}세 ${esc(sexW(c.sex))}</span></span></button>`
+      `<button class="pk${sel === c.cid ? " on" : ""}" data-c="${esc(c.cid)}"><span class="num">${c.no}</span><span class="pk-main"><span class="cc">${esc(c.cc)}${lvChip(c.level)}</span><span class="who">${esc(c.age)}세 ${esc(sexW(c.sex))}</span></span></button>`
     ).join("") || `<div class="side-empty">찾는 환자가 없습니다</div>`;
     $$(".pk", d.el).forEach(b => { b.onclick = () => { sel = b.dataset.c; list(); upd(); }; b.ondblclick = () => { sel = b.dataset.c; d.close("go"); }; });
   };
@@ -1238,7 +1240,7 @@ async function loadAdmin(){
   $("#v-admin").innerHTML = `<div class="page-head"><div class="ph-main"><h1>증례 관리</h1><div class="meta">${j.rows.length}개 · 정답이 보이는 화면입니다</div></div>
       <div class="ph-act"><button class="btn filled" id="newCase">${I("add")}<span class="t">새 증례</span></button></div></div>
     <div class="card list">${j.rows.map(r => `<div class="case-row" data-c="${esc(r.cid)}"><span class="num">${r.no}</span>
-      <div class="cr-main"><div class="cr-t">${esc(r.cc)} <span class="meta" style="font-weight:400">· ${esc(r.who)}</span></div><div class="cr-m">정답 · ${esc(r.truth)}</div></div>
+      <div class="cr-main"><div class="cr-t">${esc(r.cc)}${lvChip(r.level)} <span class="meta" style="font-weight:400">· ${esc(r.who)}</span></div><div class="cr-m">정답 · ${esc(r.truth)}</div></div>
       <span class="chip sm ${/완료/.test(r.status || "") ? "g" : "y"} hide-xs">${shortStatus(r.status)}</span>
       <button class="iconbtn" data-more="${esc(r.cid)}" title="더 보기">${I("more_vert")}</button></div>`).join("") || `<div class="side-empty">증례가 없습니다</div>`}</div>`;
   $$("#v-admin .case-row").forEach(row => row.onclick = e => { if (!e.target.closest("[data-more]")) go("#edit/" + row.dataset.c); });
@@ -1321,7 +1323,7 @@ function renderEditor(){
   ED.acting = ED.acting || {}; ED.reference = ED.reference || {}; ED.reference.A = ED.reference.A || {}; ED.reference.P = ED.reference.P || {};
   let b = "";
   if (edTab === "card") b = cardHTML(ED);
-  else if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
+  else if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.sel("난이도", "difficulty", ["", ...LEVELS])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
     <div class="card pad ed"><h3>환자 <small>진료 시작 때 보이는 것</small></h3><div class="g2">${F.text("이름", "patient.name")}${F.text("나이", "patient.age")}${F.sel("성별", "patient.sex", ["여", "남"])}${F.text("주호소", "patient.chief_complaint")}</div>
       ${F.area("첫마디 (이름·나이·주호소만)", "patient.opening")}${F.area("활력징후", "vitals")}</div>`;
   else if (edTab === "script") b = `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
