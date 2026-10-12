@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOVA 샘플 검증</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#172033;background:#f5f7fb;line-height:1.55}
+body{max-width:860px;margin:0 auto;padding:32px 18px 64px}h1{margin:0 0 6px;font-size:28px}h2{margin:28px 0 10px;font-size:19px}.muted{color:#697386}.card{background:#fff;border:1px solid #dfe5ef;border-radius:14px;padding:20px;margin:16px 0;box-shadow:0 4px 18px #1720330b}.drop{display:flex;align-items:center;justify-content:center;min-height:130px;border:2px dashed #9aabd2;border-radius:12px;background:#f8faff;text-align:center;cursor:pointer}.drop:hover{border-color:#3456c6;background:#f0f4ff}input[type=file]{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:8px;padding:10px 15px;font-size:15px;font-weight:700;cursor:pointer;background:#3456c6;color:#fff}button.secondary{background:#e7edff;color:#17307a}button:disabled{opacity:.45;cursor:not-allowed}.file{font-weight:700;margin-top:10px}.pill{display:inline-block;border-radius:999px;padding:3px 10px;background:#edf1f7;color:#526079;font-size:13px}.pill.ok{background:#dcf3e6;color:#17623d}.pill.bad{background:#fde8e6;color:#a02118}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.case{border:1px solid #dfe5ef;border-radius:10px;padding:12px}.case b{display:block}.case small{color:#697386}.error{white-space:pre-wrap;color:#a02118;background:#fff2f0;padding:10px;border-radius:8px}.notice{background:#fff8e6;padding:12px;border-radius:8px;color:#705000}.criteria{display:grid;grid-template-columns:1fr auto;gap:4px 18px}.bar{height:8px;background:#e8edf5;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:#3456c6}@media(max-width:600px){.grid{grid-template-columns:1fr}.criteria{grid-template-columns:1fr auto}}
+</style>
+</head>
+<body>
+<p><a href="index.html">← CPX 가상 환자</a></p>
+<h1>NOVA 샘플 검증</h1>
+<p class="muted">스타터 ZIP을 올려 제출 계약을 검사하고 C01·C03·C10 공개 샘플에서 실행합니다. <a href="nova-rules.html">대회 규칙·SOAP 가이드 보기</a></p>
+
+<section class="card">
+  <h2>1. 제출 ZIP 선택</h2>
+  <label class="drop" for="zip">ZIP 파일을 여기에 놓거나 클릭해서 선택<br><small>루트에 run.py·requirements.txt · 압축 50MB 이하</small></label>
+  <input id="zip" type="file" accept=".zip,application/zip">
+  <div id="file" class="file muted">선택된 파일 없음</div>
+  <div class="actions"><button id="validate" class="secondary" disabled>제출 형식 검사</button><button id="evaluate" disabled>3건 실행</button></div>
+  <div id="validation"></div>
+</section>
+
+<section class="card">
+  <h2>2. 대회와 같은 로컬 규칙</h2>
+  <div class="criteria"><span>정보수집</span><b>25점</b><span>진단추론</span><b>15점</b><span>검사·추적</span><b>10점</b><span>안전</span><b>15점</b><span>의사소통</span><b>15점</b><span>효율</span><b>20점</b></div>
+  <p class="muted">증례당 50턴 · SAY/EXAM 30 NFC 코드 포인트 · 한 턴에 하나 · 예선 TEST 불가 · 확인한 내용만 S/O에 기록.</p>
+  <div class="notice">개발 키트는 공식 채점을 하지 않습니다. 실행 성공 여부와 transcript/record를 확인한 뒤 실제 NOVA 서버의 샘플 검증에서 참고 점수를 받으세요.</div>
+</section>
+
+<section class="card" id="result" hidden><h2>3. 실행 결과</h2><div id="status" class="muted"></div><div id="cases" class="grid"></div><pre id="log" class="notice" hidden></pre></section>
+<script>
+const $=s=>document.querySelector(s), zip=$("#zip"), file=$("#file"), validateBtn=$("#validate"), evalBtn=$("#evaluate"), validation=$("#validation"), result=$("#result"), status=$("#status"), cases=$("#cases"), log=$("#log");
+let selected=null, valid=false, current="";
+zip.onchange=()=>{selected=zip.files[0]||null; valid=false; file.textContent=selected?`${selected.name} · ${(selected.size/1024/1024).toFixed(2)}MB`:'선택된 파일 없음'; validateBtn.disabled=!selected; evalBtn.disabled=true; validation.innerHTML='';};
+function showValidation(v){valid=!!v.valid; evalBtn.disabled=!valid; validation.innerHTML=`<p><span class="pill ${valid?'ok':'bad'}">${valid?'제출 가능':'제출 거부'}</span> ${v.file_count}개 파일 · ${(v.uncompressed_bytes/1024/1024).toFixed(2)}MB</p>${v.errors?.length?`<div class="error">${v.errors.join('\n')}</div>`:''}${v.warnings?.length?`<p class="muted">${v.warnings.join('<br>')}</p>`:''}`;}
+async function send(path){const r=await fetch('/api/submission/'+path,{method:'POST',headers:{'Content-Type':'application/zip','X-Filename':selected.name},body:selected});const j=await r.json();if(!r.ok&&!j.validation)throw Error(j.error||'업로드 실패');return j;}
+validateBtn.onclick=async()=>{validateBtn.disabled=true;try{showValidation((await send('validate')).validation);}catch(e){validation.innerHTML=`<div class="error">${e.message}</div>`;}finally{validateBtn.disabled=false;}};
+function render(j){result.hidden=false;status.textContent=`상태: ${j.status||'확인 중'} · 실행 ID ${j.run_id||current}`;cases.innerHTML=(j.cases||[]).map(c=>`<div class="case"><b>${c.case_id}</b><span class="pill ${c.status==='passed'?'ok':c.status==='failed'?'bad':''}">${c.status}</span><small>${c.turns==null?'':`${c.turns}턴 · Doctor ${c.doctor_calls??'-'}회 · ${c.seconds??'-'}초`}</small></div>`).join('');if(j.error){log.hidden=false;log.textContent=j.error;}else if(j.cases?.some(c=>c.output_tail)){log.hidden=false;log.textContent=j.cases.map(c=>`--- ${c.case_id} ---\n${c.output_tail}`).join('\n');}}
+async function poll(){try{const j=await (await fetch('/api/submission/runs/'+current)).json();render(j);if(['running','queued'].includes(j.status)){setTimeout(poll,1500)}}catch(e){status.textContent=e.message;setTimeout(poll,2000)}}
+evalBtn.onclick=async()=>{evalBtn.disabled=true;result.hidden=false;status.textContent='업로드하고 3건을 실행하는 중…';try{const j=await send('evaluate');current=j.run_id;render(j);poll();}catch(e){status.textContent=e.message;evalBtn.disabled=false;}};
+</script>
+</body>
+</html>

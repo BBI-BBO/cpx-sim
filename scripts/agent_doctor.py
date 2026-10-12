@@ -17,6 +17,12 @@ import argparse, getpass, json, os, re, sys, time, urllib.error, urllib.request
 
 DEFAULT_API = "https://yobrfksujprspfziukoa.supabase.co/functions/v1"
 WEB = "https://bbi-bbo.github.io/cpx-sim/"
+RECORD_FIELDS = {
+    "S": ("cc", "hpi", "pmh", "fh", "sh", "ros"),
+    "O": ("exam", "tests"),
+    "A": ("evidence", "differential"),
+    "P": ("tests", "treatment", "disposition", "follow_up", "education"),
+}
 
 DOCTOR_SYS = """당신은 의사국가시험 CPX 응시자(의사)입니다. 가상 표준화 환자를 진료하고 초진 기록(SOAP)과 주진단을 제출합니다.
 
@@ -25,11 +31,11 @@ DOCTOR_SYS = """당신은 의사국가시험 CPX 응시자(의사)입니다. 가
   {{"act": "SAY", "text": "환자에게 할 말"}}            질문·설명·공감. {maxlen}자 이하, 한 번에 하나만 묻기 (1턴)
   {{"act": "EXAM", "text": "진찰 동작 하나"}}           예: "배를 눌러 볼게요" (1턴)
   {{"act": "TEST", "text": "검사 하나"}}                {test_rule} (1턴)
-  {{"act": "SUBMIT", "soap": {{"S": "...", "O": "...", "A": "...", "P": "..."}}, "dx": "주진단 1개"}}   진료 끝 (0턴)
-- 최대 {max_turns}턴. 두 가지를 한꺼번에 묻거나({maxlen}자 초과 포함) 진찰·검사를 묶으면 반려되고 턴은 줄지 않습니다.
+  {{"act": "SUBMIT", "note": {{"S": {{"cc": "", "hpi": "", "pmh": "", "fh": "", "sh": "", "ros": ""}}, "O": {{"exam": "", "tests": ""}}, "A": {{"evidence": "", "differential": ""}}, "P": {{"tests": "", "treatment": "", "disposition": "", "follow_up": "", "education": ""}}}}, "dx": "주진단 1개"}}   진료 끝 (0턴)
+- 최대 {max_turns}턴. 진찰·검사를 묶거나 잘못된 진찰을 보내면 반려됩니다. 빈 내용·{maxlen}자 초과 SAY/EXAM·잘못된 EXAM은 대회 규정상 1턴을 사용하고, 예선 TEST나 제공되지 않는 TEST는 턴을 쓰지 않습니다.
 - 진찰·검사 목록은 주지 않습니다. 필요한 것을 하나씩 문장으로 요청합니다.
 - SOAP 에는 대화·진찰(·검사)로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 감점됩니다.
-  S: 환자가 말한 것 · O: 활력징후·진찰 소견 · A: 주진단 가설·근거·감별진단 · P: 검사·처치·안전 조치·추적·설명
+  S: cc·hpi·pmh·fh·sh·ros는 환자가 말했거나 실제로 확인한 내용 · O: exam·tests는 활력징후·진찰·검사 결과 · A: evidence·differential은 근거·감별진단 · P: tests·treatment·disposition·follow_up·education은 계획
 - 채점: 정보수집 25 · 진단추론 15 · 검사·추적 10 · 안전 15(놓치면 위험한 것 확인) · 의사소통 15(환자 설문) · 효율 20
 - 환자에게 인사하고, 열린 질문으로 시작해 좁혀 가고, 공감하고, 마무리에 설명과 안전망을 주는 것이 좋은 진료입니다."""
 
@@ -122,9 +128,19 @@ def parse_action(text):
     if act in ("SAY", "EXAM", "TEST") and str(a.get("text", "")).strip():
         return {"act": act, "text": str(a["text"]).strip()}
     if act == "SUBMIT" and str(a.get("dx", "")).strip():
-        soap = a.get("soap") or {}
-        return {"act": "SUBMIT", "soap": {k: str(soap.get(k, "")) for k in "SOAP"}, "dx": str(a["dx"]).strip()}
+        raw = a.get("note") or a.get("soap") or {}
+        note = {}
+        for section, fields in RECORD_FIELDS.items():
+            values = raw.get(section) if isinstance(raw, dict) and isinstance(raw.get(section), dict) else {}
+            note[section] = {field: str(values.get(field, "") or "") for field in fields}
+        return {"act": "SUBMIT", "note": note, "dx": str(a["dx"]).strip()}
     return None
+
+
+def note_summary(note):
+    """구형 팀 API 호환용 요약. 공식 구조는 soap_fields로 함께 보낸다."""
+    return {section: "\n".join(f"{field}: {note[section][field]}" for field in fields if note[section][field])
+            for section, fields in RECORD_FIELDS.items()}
 
 
 # ───────────── 진료 한 번 ─────────────
@@ -159,7 +175,7 @@ def encounter(clinic, doctor, cfg, case, mode, quiet=False, meta=None, hint=""):
             bad_streak += 1
             note = "(방금 답은 JSON 형식이 맞지 않았습니다. 규칙의 네 가지 중 하나를 JSON 하나로만 내세요.)"
             if bad_streak >= 10:
-                action = {"act": "SUBMIT", "soap": {k: "" for k in "SOAP"}, "dx": "판단 불가"}
+                action = {"act": "SUBMIT", "note": {section: {field: "" for field in fields} for section, fields in RECORD_FIELDS.items()}, "dx": "판단 불가"}
             else:
                 continue
         if action["act"] == "SUBMIT":
@@ -174,14 +190,19 @@ def encounter(clinic, doctor, cfg, case, mode, quiet=False, meta=None, hint=""):
             log.append(f"[{turn}턴 {action['act']}] 의사: {action['text']} → {obs}")
             say(f"[{turn:>2}턴 {action['act']}] {action['text']}\n        {obs}")
         else:
+            if r.get("turn") is not None:
+                turn = r["turn"]
             bad_streak += 1
-            obs = f"안 됨 (턴 차감 없음): {r.get('out')}"
+            obs = f"안 됨: {r.get('out')}"
             log.append(f"[안 됨 {action['act']}] 의사: {action['text']} → {r.get('out')}")
             say(f"[반려 {action['act']}] {action['text']}\n        {obs}")
     say(f"[제출] 주진단: {action['dx']}")
-    for k in "SOAP":
-        say(f"  {k}: {action['soap'][k]}")
-    res = clinic.post("/api/submit", {"name": name, "soap": action["soap"], "dx": action["dx"]})
+    for section, fields in RECORD_FIELDS.items():
+        for field in fields:
+            if action["note"][section][field]:
+                say(f"  {section}.{field}: {action['note'][section][field]}")
+    res = clinic.post("/api/submit", {"name": name, "soap": note_summary(action["note"]),
+                                      "soap_fields": action["note"], "dx": action["dx"]})
     sub = res["submit"]
     acc = (sub.get("judge") or {}).get("accuracy")
     say(f"→ 점수 {sub['total']}/100  {sub['scores']}  주진단 정확도 {acc}  정답: {sub.get('truth')}")

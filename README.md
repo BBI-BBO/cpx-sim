@@ -1,5 +1,43 @@
 # CPX 가상 환자
 
+대회 규칙·환자 상호작용·공개 샘플과 공식 평가의 차이·SOAP 고정 필드·제출 전 체크리스트는 [docs/NOVA_RULES_SOAP.md](docs/NOVA_RULES_SOAP.md)에 상세히 정리되어 있습니다.
+
+## NOVA 2026 공개 샘플 검증
+
+N.O.V.A. 2026 공개 샘플 C01·C03·C10을 `fixtures/nova-samples-2026/`에 추가했고, CPX 저장 형식으로 변환한 케이스 맵은 `fixtures/nova-samples-cases.json`입니다. 공개 샘플 원문·모범 기록은 연습과 검증용이며 공식 평가 증례나 만점 답안이 아닙니다.
+
+스타터 ZIP의 대회 제출 계약을 먼저 검사합니다.
+
+```bash
+python scripts/validate_submission.py /Users/haechan/Downloads/nova-starter.zip
+```
+
+로컬 개발 키트로 세 공개 샘플을 차례로 실행하려면, OpenAI 호환 Doctor/시뮬레이터 모델을 준비한 뒤 실행합니다. 개발 키트는 채점하지 않고 `transcript.json`과 `record.json`을 만듭니다.
+
+```bash
+python scripts/evaluate_submission.py \
+  --submission /Users/haechan/Downloads/nova-starter.zip \
+  --devkit /Users/haechan/Downloads/nova-devkit \
+  --out submission-runs/starter
+```
+
+파일을 화면에서 제출하려면 별도 로컬 실행기를 켜고 `http://127.0.0.1:8765/nova-evaluate.html`을 여세요.
+
+```bash
+python scripts/submission_server.py --devkit /Users/haechan/Downloads/nova-devkit
+```
+
+화면의 `3건 실행`은 C01·C03·C10을 대회와 같은 `prepare()`/`consult()` 계약으로 실행합니다. 공개 개발 키가 있고 서버 참고 점수까지 확인하려면 스타터의 `sample.py`로 `NOVA_API_BASE`와 `NOVA_DEV_KEY`를 설정해 NOVA 서버 샘플 검증을 별도로 실행하세요. 로컬 개발 키트는 의도적으로 채점하지 않습니다.
+
+DB에 세 환자를 배포한 CPX 화면에 넣으려면 관리자 API에서 사용할 비밀번호로 다음을 실행합니다.
+
+```bash
+SP_WEB_PASSWORD='비밀번호' python scripts/import_nova_to_api.py \
+  https://<project>.supabase.co/functions/v1
+```
+
+로컬 API는 NOVA 공개 규정에 맞춰 증례당 30분, 최대 50턴, SAY·EXAM 30 NFC 코드 포인트, 예선 TEST 금지, 빈 내용·30자 초과·잘못된 EXAM의 1턴 사용, 제공하지 않는 TEST의 무턴 반려를 적용합니다. 점수 영역은 정보수집 25·진단추론 15·검사·추적 10·안전 15·의사소통 15·효율 20입니다.
+
 N.O.V.A. 2026 진단 에이전트 대회 예선 규정(SAY·EXAM·TEST, 30자·한 번에 하나, 50턴)으로 표준화 환자를 진료하고,
 S·O·A·P 초진 기록을 제출하면 CPX 방식으로 채점하는 연습 도구입니다. 사람은 웹에서, AI 의사(Claude·GPT 등)는 아래 API로 진료합니다.
 
@@ -17,7 +55,7 @@ S·O·A·P 초진 기록을 제출하면 CPX 방식으로 채점하는 연습 �
 ## 1. 웹에서 진료하기
 
 1. 왼쪽 위에서 환자를 고르고 **새 진료** → 예선/본선.
-2. **대화** 탭에서 대화·진찰(·검사)을 한 번에 하나씩. 묶은 질문이나 30자 초과는 반려(턴 차감 없음).
+2. **대화** 탭에서 대화·진찰(·검사)을 한 번에 하나씩. 빈 내용·30자 초과·잘못된 진찰은 대회 규정에 따라 1턴을 사용하고, 제공되지 않는 검사는 턴을 쓰지 않고 반려합니다.
 3. **SOAP 기록** 탭에 S·O·A·P와 주진단을 쓰고 제출 (쓰는 대로 자동 저장).
 4. **결과** 탭: 점수·사용 턴, 영역별 점수, 대화와 SOAP 원문에 색 하이라이트 (초록 좋음 · 주황 아쉬움 · 빨강 틀림). 마우스를 올리면(휴대폰은 누르면) 피드백.
 
@@ -75,7 +113,7 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 요청 {"name": "20261007_152919_A", "act": "TEST", "text": "CBC 볼게요"}       // 본선만
 응답 {"ok": true,  "out": "엿새 전부터 아팠어요.", "turn": 3, "rejected": 0}
 응답 {"ok": true,  "out": "복부 촉진: 복부 전체에 압통이 있다.", "turn": 4, …}
-응답 {"ok": false, "out": "반려: 한 번에 하나씩 물어봐 주세요 (턴 차감 없음)", "turn": 4, "rejected": 1}
+응답 {"ok": false, "out": "반려: 신체진찰 동작을 인식하지 못했습니다 (1턴 사용)", "turn": 5, "rejected": 1}
 ```
 | act | 뜻 | 규칙 |
 |---|---|---|
@@ -88,18 +126,18 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 **⑤ SOAP 제출** `POST /api/submit` — 진료가 끝나고 채점합니다. 1~2분 걸리니 요청 시간 제한을 넉넉히 (예: `curl --max-time 180`).
 ```json
 요청 {"name": "20261007_152919_A",
-      "soap": {"S": "20세 여성, 6일 전부터 배 전체 통증, 구토 반복, 발열 부인",
-               "O": "고혈압·빈맥, 복부 전체 압통",
-               "A": "급성 간헐성 포르피린증 의심 — 근거 … / 감별: 급성 위장염, …",
-               "P": "소변 PBG·전해질, 수액·진통, 신경 증상 관찰, …"},
-      "dx": "급성 간헐성 포르피린증"}
+      "note": {"S": {"cc": "20세 여성, 6일 전부터 배 전체 통증", "hpi": "구토 반복", "pmh": "", "fh": "", "sh": "", "ros": "발열 부인"},
+               "O": {"exam": "고혈압·빈맥, 복부 전체 압통", "tests": ""},
+               "A": {"evidence": "복통과 구토, 활력징후 이상", "differential": "r/o 급성 위장염 : 구토 동반"},
+               "P": {"tests": "소변 PBG·전해질", "treatment": "수액·진통", "disposition": "관찰", "follow_up": "신경 증상 확인", "education": ""}},
+      "diagnosis": "급성 간헐성 포르피린증"}
 응답 {"name": "…", "done": true,
       "submit": {"total": 73, "scores": {"정보수집": 22, "진단추론": 12, "검사·추적": 8, "안전": 11, "의사소통": 6, "효율": 14},
                  "truth": "급성 간헐성 포르피린증 (E80.2)", "turns": 35, "rejected": 3,
                  "judge": {"accuracy": 100, "soap_sentences": […], "turn_notes": […], "checklist": […], "red_flags": […], "soap_top": […]},
                  "patient": {"good": […], "regret": […], "ppi": {…}}}}
 ```
-SOAP 에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다.
+`note`는 SDK `empty_record()`와 동일한 고정 중첩 구조여야 합니다. `A`에는 `diagnosis`가 없고, 주진단은 `diagnosis`로 별도 보냅니다. SOAP에는 대화·진찰로 실제로 얻은 것만 씁니다. 묻지 않은 것을 쓰면 '지어낸 기록'으로 깎입니다.
 환자의 짐작·들은 말은 "환자는 ~라고 함"처럼 환자 말로 적습니다. `dx` 는 병명 하나 (코드는 붙이지 않아도 됨).
 결과 화면은 `https://bbi-bbo.github.io/cpx-sim/#c/<name>/result`.
 

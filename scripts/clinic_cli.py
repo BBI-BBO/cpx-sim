@@ -6,12 +6,12 @@ agent_doctor.py 와 같은 서버·규칙·채점. 비밀번호는 .env(SP_WEB_P
   python3 clinic_cli.py say  <진료이름> "말 하나"                  # 질문·설명 (1턴)
   python3 clinic_cli.py exam <진료이름> "진찰 동작 하나"            # 진찰 (1턴)
   python3 clinic_cli.py submit <진료이름> <<'EOF'                  # 제출 → 점수
-  {"dx": "주진단", "soap": {"S": "...", "O": "...", "A": "...", "P": "..."}}
+  {"dx": "주진단", "note": {"S": {"cc": "", "hpi": "", "pmh": "", "fh": "", "sh": "", "ros": ""}, "O": {"exam": "", "tests": ""}, "A": {"evidence": "", "differential": ""}, "P": {"tests": "", "treatment": "", "disposition": "", "follow_up": "", "education": ""}}}
   EOF
 """
 import json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from agent_doctor import Clinic, dotenv, DEFAULT_API, WEB  # noqa: E402
+from agent_doctor import Clinic, dotenv, DEFAULT_API, WEB, RECORD_FIELDS, note_summary  # noqa: E402
 
 TOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".clinic_token.json")
 
@@ -60,7 +60,10 @@ def main(a):
             print(f"반려 (턴 차감 없음): {r.get('out')}")
     elif cmd == "submit":
         b = json.loads(sys.stdin.read())
-        res = c.post("/api/submit", {"name": a[2], "soap": {k: str(b["soap"].get(k, "")) for k in "SOAP"}, "dx": b["dx"]})
+        raw = b.get("note") or b.get("soap") or {}
+        note = {section: {field: str((raw.get(section) or {}).get(field, "") or "") if isinstance(raw.get(section), dict) else ""
+                          for field in fields} for section, fields in RECORD_FIELDS.items()}
+        res = c.post("/api/submit", {"name": a[2], "soap": note_summary(note), "soap_fields": note, "dx": b["dx"]})
         s = res["submit"]
         print(f"점수 {s['total']}/100 {s['scores']} · 주진단 정확도 {(s.get('judge') or {}).get('accuracy')} · 정답 {s.get('truth')} · {s.get('turns')}턴")
         print(f"결과 화면: {WEB}#c/{a[2]}/result")

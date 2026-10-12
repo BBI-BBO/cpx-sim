@@ -13,7 +13,7 @@ const SB_KEY = env("SUPABASE_SERVICE_ROLE_KEY") || (() => {
   try { return Object.values(JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}"))[0] as string || ""; } catch { return ""; }
 })() || env("SUPABASE_SECRET_KEY");
 const SB_HEAD: Record<string, string> = SB_KEY.startsWith("sb_") ? { apikey: SB_KEY } : { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-const MAX_MIN = Number(env("SP_MAX_MIN") || 0);       // 0 = 시간 제한 없음 (대회는 20)
+const MAX_MIN = Number(env("SP_MAX_MIN") || 30);      // NOVA 공개 샘플 진료 제한: 증례당 30분
 const AUTH_DAYS = Number(env("SP_AUTH_DAYS") || 1);   // 한 번 들어오면 유지되는 날 수
 const MODELS: Record<string, string> = {
   router: env("SP_ROUTER_MODEL") || "gpt-6-luna", patient: env("SP_PATIENT_MODEL") || "gpt-6-luna",
@@ -56,6 +56,33 @@ const DB_URL = env("SP_DB_DIRECT") === "1" ? env("SUPABASE_DB_URL") : "";
 const sql: any = DB_URL ? postgres(DB_URL, { max: 4, prepare: false, idle_timeout: 30, connect_timeout: 8, onnotice: () => {} }) : null;
 let useSql = !!sql;
 const JSONB = new Set(["start", "events", "draft", "submits", "meta", "usage", "scores", "data"]);
+const SOAP_FIELDS: Record<string, string[]> = {
+  S: ["cc", "hpi", "pmh", "fh", "sh", "ros"],
+  O: ["exam", "tests"],
+  A: ["evidence", "differential"],
+  P: ["tests", "treatment", "disposition", "follow_up", "education"],
+};
+function normalizeSoapFields(input: any, soap: Record<string, string>) {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [section, fields] of Object.entries(SOAP_FIELDS)) {
+    out[section] = {};
+    for (const field of fields) {
+      const value = input?.[section]?.[field];
+      out[section][field] = value == null ? "" : String(value);
+    }
+  }
+  return out;
+}
+function soapInput(body: any) {
+  const rawFields = body.note || body.soap_fields || {};
+  const rawSoap = body.soap || {};
+  const soap: Record<string, string> = {};
+  for (const section of ["S", "O", "A", "P"]) {
+    const value = rawSoap[section];
+    soap[section] = typeof value === "string" ? value : Object.values(rawFields?.[section] || {}).filter(Boolean).join("\n");
+  }
+  return { soap, soapFields: normalizeSoapFields(rawFields, soap) };
+}
 const wrap = (o: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(o).map(([k, v]) => [k, JSONB.has(k) && v !== null && v !== undefined ? sql.json(v) : v]));
 const connErr = (e: any) => /connect|ECONN|ETIMEDOUT|getaddrinfo|network|CONNECTION|socket|TLS/i.test(`${e?.code ?? ""} ${e?.message ?? e}`);
@@ -149,7 +176,7 @@ async function saveEnc(R: any, extra: Record<string, unknown> = {}) {
   const subs = R.submits || [], last = subs.at(-1);
   await db.encPatch(R.name, {
     events: R.events, draft: R.draft ?? null, submits: subs, meta: R.meta || {}, usage: R.usage,
-    turns: R.events.filter((e: any) => e.type === "turn").length, n_submits: subs.length,
+    turns: R.events.filter((e: any) => e.type === "turn" || (e.type === "reject" && e.consumes_turn)).length, n_submits: subs.length,
     total: last ? last.total : null, dx: last ? last.dx : null, truth: last ? last.truth : null,
     accuracy: last ? (last.judge || {}).accuracy ?? null : null, scores: last ? last.scores : null, ...extra,
   });
@@ -267,7 +294,9 @@ function bullets(d: Record<string, any>) {
 }
 
 // ───────────── 진료 엔진 (sp_sim.py Encounter 와 같음) ─────────────
-const turnsOf = (R: any) => (R.events || []).filter((e: any) => e.type === "turn");
+// NOVA 규칙상 빈 내용·30자 초과·잘못된 EXAM도 1턴을 사용한다. 반려 이벤트에
+// consumes_turn을 남겨 화면의 반려 표시와 실제 턴 수를 동시에 보존한다.
+const turnsOf = (R: any) => (R.events || []).filter((e: any) => e.type === "turn" || (e.type === "reject" && e.consumes_turn));
 const rejectsOf = (R: any) => (R.events || []).filter((e: any) => e.type === "reject").length;
 const maxTurns = (R: any) => R.start?.max_turns || P.MAX_TURNS;
 function elapsedSec(R: any, now = Date.now() + 9 * 3600e3): number {
@@ -280,7 +309,7 @@ function elapsedSec(R: any, now = Date.now() + 9 * 3600e3): number {
 }
 function transcript(C: any, turns: any[]) {
   return [`[시작] 환자: ${C.patient?.opening} / 활력징후: ${C.vitals ?? "None"}`,
-    ...turns.map((e: any) => `[${e.turn}턴 ${e.act}] 의사: ${e.text}\n        → ${e.out}`)].join("\n");
+    ...turns.map((e: any) => `[${e.turn}턴 ${e.act}] 의사: ${e.text}\n        → ${e.out ?? `반려: ${e.why}`}`)].join("\n");
 }
 function checkMsg(R: any): string | null {
   if ((R.submits || []).length) return "진료가 이미 끝났습니다.";
@@ -288,9 +317,10 @@ function checkMsg(R: any): string | null {
   if (turnsOf(R).length >= maxTurns(R)) return `${maxTurns(R)}턴을 모두 썼습니다. /제출 로 마무리하세요.`;
   return null;
 }
-function reject(R: any, act: string, text: string, why: string) {
-  R.events.push({ type: "reject", act, text, why, time: kst() });
-  return { ok: false, out: `반려: ${why} (턴 차감 없음)` };
+function reject(R: any, act: string, text: string, why: string, consumesTurn = false) {
+  const turn = turnsOf(R).length + (consumesTurn ? 1 : 0);
+  R.events.push({ type: "reject", act, text, why, turn: consumesTurn ? turn : undefined, consumes_turn: consumesTurn, time: kst() });
+  return { ok: false, out: `반려: ${why} (${consumesTurn ? "1턴 사용" : "턴 차감 없음"})` };
 }
 // 감정으로 맺는 버릇 줄이기: 최근 대답 셋 중 하나라도 감정으로 끝났으면 이번엔 감정 말을 빼라고 덧붙인다 (sp_sim.emo_hint 와 같음)
 function lastSentence(s: string) {
@@ -309,7 +339,7 @@ async function patientReply(R: any, C: any, text: string, U: Usage) {
   const beliefs = (C.beliefs || []).filter((x: any) => x?.belief).map((x: any) => `- (${x.kind || "짐작"}) ${x.belief}`).join("\n") || "(없음)";
   const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, persona, script: bullets(C.script || {}), qa, beliefs });
   const msgs: any[] = [{ role: "system", content: sys }, { role: "user", content: "(진료 시작)" }, { role: "assistant", content: p.opening || "" }];
-  const turns = turnsOf(R);
+  const turns = turnsOf(R).filter((e: any) => e.type === "turn");
   for (const e of turns.slice(-20)) {
     if (e.act === "SAY") msgs.push({ role: "user", content: e.text }, { role: "assistant", content: e.out });
     else msgs.push({ role: "user", content: `(${e.act}: ${e.text})` }, { role: "assistant", content: "네." });
@@ -323,41 +353,45 @@ async function patientReply(R: any, C: any, text: string, U: Usage) {
 async function say(R: any, C: any, text: string, U: Usage) {
   const m = checkMsg(R);
   if (m) return { ok: false, out: m };
-  const len = [...text].length;
-  if (len > P.MAXLEN) return reject(R, "SAY", text, `${len}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`);
-  const core = text.replace(GREET, "").trim() || text;  // 앞의 인사·맞장구는 세지 않는다
-  if ((core.match(/[?？]/g) || []).length >= 2) return reject(R, "SAY", text, "한 번에 하나씩 물어봐 주세요");
+  const normalized = text.normalize("NFC");
+  const len = [...normalized].length;
+  if (!normalized.trim()) return reject(R, "SAY", text, "내용을 입력해 주세요", true);
+  if (len > P.MAXLEN) return reject(R, "SAY", text, `${len}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`, true);
+  const core = normalized.replace(GREET, "").trim() || normalized;  // 앞의 인사·맞장구는 세지 않는다
   const turns = turnsOf(R);
-  const hist = turns.slice(-4).filter((e: any) => e.act === "SAY").map((e: any) => `의사: ${e.text}\n환자: ${e.out}`).join("\n");
+  const hist = turns.slice(-4).filter((e: any) => e.type === "turn" && e.act === "SAY").map((e: any) => `의사: ${e.text}\n환자: ${e.out}`).join("\n");
   const r = await cjson("router", [{ role: "system", content: P.SAY_ROUTER }, { role: "user", content: `최근 대화:\n${hist || "(없음)"}\n\n의사의 말: ${core}` }], 2000, U);
-  let items = parseInt(String(r.items ?? 1)); if (isNaN(items)) items = 1;
-  if (items >= 2) return reject(R, "SAY", text, `한 번에 하나씩 물어봐 주세요 — ${r.why ?? ""}`.replace(/[ —]+$/, ""));
-  const out = await patientReply(R, C, text, U);
-  R.events.push({ type: "turn", turn: turns.length + 1, act: "SAY", text, out, time: kst() });
+  const out = await patientReply(R, C, normalized, U);
+  R.events.push({ type: "turn", turn: turns.length + 1, act: "SAY", text: normalized, out, time: kst() });
   return { ok: true, out, tip: r.exam_like ? " (진찰 결과가 필요하면 /진찰 로 요청하세요)" : "" };
 }
 async function act(R: any, C: any, kind: string, text: string, U: Usage) {
   const m = checkMsg(R);
   if (m) return { ok: false, out: m };
+  const normalized = text.normalize("NFC");
+  if (kind === "TEST" && R.mode !== "본선") return { ok: false, out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
+  if (!normalized.trim()) return reject(R, kind, normalized, "내용을 입력해 주세요", true);
+  if ([...normalized].length > P.MAXLEN) return reject(R, kind, normalized, `${[...normalized].length}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`, true);
   let pool: any[], what: string, empty: string;
   if (kind === "EXAM") {
     pool = [...(C.exam || [])];
     if (C.vitals) pool.push({ id: "V", name: "활력징후 측정 (혈압·맥박·호흡·체온·산소포화도)", finding: C.vitals });
     what = "진찰"; empty = "특이 소견 없음";
   } else {
-    if (R.mode !== "본선") return { ok: false, out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
     pool = [...(C.tests || [])]; what = "검사"; empty = "결과 없음";
   }
   const items = pool.map((x) => `${x.id}: ${x.name}`).join("\n") || "(없음)";
-  const r = await cjson("router", [{ role: "system", content: fmt(P.ACT_ROUTER, { what, items }) }, { role: "user", content: text }], 2000, U);
+  const r = await cjson("router", [{ role: "system", content: fmt(P.ACT_ROUTER, { what, items }) }, { role: "user", content: normalized }], 2000, U);
   let n = parseInt(String(r.items ?? 1)); if (isNaN(n)) n = 1;
-  if (n >= 2) return reject(R, kind, text, `${what === "진찰" ? "진찰은" : "검사는"} 한 번에 하나만 요청해 주세요 — ${r.why ?? ""}`.replace(/[ —]+$/, ""));
+  if (n >= 2) return reject(R, kind, normalized, `${what === "진찰" ? "진찰은" : "검사는"} 한 번에 하나만 요청해 주세요 — ${r.why ?? ""}`.replace(/[ —]+$/, ""), kind === "EXAM");
   const hit = pool.find((x) => x.id === r.id);
-  const out = hit ? `${hit.name}: ${hit.finding || hit.result}` : `${r.label || text}: ${empty}`;
-  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: kind, text, id: r.id ?? null, out, time: kst() });
+  if (!hit && kind === "EXAM") return reject(R, kind, normalized, "신체진찰 동작을 인식하지 못했습니다", true);
+  if (!hit && kind === "TEST") return reject(R, kind, normalized, "대회에서 제공하지 않는 검사입니다");
+  const out = hit ? `${hit.name}: ${hit.finding || hit.result}` : `${r.label || normalized}: ${empty}`;
+  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: kind, text: normalized, id: r.id ?? null, out, time: kst() });
   return { ok: true, out };
 }
-async function submit(R: any, C: any, soap: Record<string, string>, dx: string, U: Usage, rescore = false) {
+async function submit(R: any, C: any, soap: Record<string, string>, soapFields: Record<string, any>, dx: string, U: Usage, rescore = false) {
   const subs = R.submits || [], turns = turnsOf(R), rejected = rejectsOf(R);
   const mins = rescore && subs.length ? num(subs[0].minutes) : elapsedSec(R) / 60;
   const overtime = !!MAX_MIN && mins > MAX_MIN;
@@ -368,7 +402,8 @@ async function submit(R: any, C: any, soap: Record<string, string>, dx: string, 
     `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(C.exam || [])}\n` +
     `[환자가 잘못 알거나 모르는 것]\n${JSON.stringify(C.beliefs || [])}\n` +
     `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n` +
-    `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
+    `[모델 사용량] 호출 ${U.calls}회 · 입력 ${U.in}토큰 · 출력 ${U.out}토큰. 효율 점수에서 불필요한 호출·출력과 행동 턴 비용을 함께 고려하되, 필요한 임상 추론 호출은 불이익을 주지 마세요.\n` +
+    `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 공식 필드별 JSON]\n${JSON.stringify(soapFields, null, 1)}\n[문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
   const p = C.patient || {}, acting = { ...(C.acting || {}), ...(C.persona || {}) };
   const prevPatient = rescore && subs.length ? subs.at(-1).patient : null;  // 대화는 그대로이므로 환자 설문은 처음 것을 쓴다
   const [j, pf] = await Promise.all([
@@ -382,7 +417,7 @@ async function submit(R: any, C: any, soap: Record<string, string>, dx: string, 
   for (const k of ["soap_top", "soap_more"]) if (Array.isArray(j[k])) j[k].sort((a: any, b: any) => (sev[String(a.sev ?? "").trim()] ?? 9) - (sev[String(b.sev ?? "").trim()] ?? 9));
   const scores = scoreDomains(j, pf);
   const total = overtime ? 0 : Object.values(scores).reduce((a, b) => a + b, 0);
-  R.submits = [...subs, { type: "submit", total, scores, overtime, judge: j, patient: pf, soap, soap_split: split, dx, turns: turns.length, rejected,
+  R.submits = [...subs, { type: "submit", total, scores, overtime, judge: j, patient: pf, soap, soap_fields: soapFields, soap_split: split, dx, turns: turns.length, rejected,
     minutes: Math.round(mins * 10) / 10, truth: C.truth, usage: { ...U }, time: kst() }];
   R.draft = null;
 }
@@ -583,7 +618,6 @@ async function handle(req: Request): Promise<Response> {
   }
   if (path === "/api/act") {
     const kind = String(b.act || "SAY").toUpperCase(), text = String(b.text || "").trim();
-    if (!text) return reply({ ok: false, out: "내용을 입력해 주세요." });
     const R = await getEnc(safe(b.name)), C = await getCase(R.cid, true);
     R.usage = R.usage || { calls: 0, in: 0, out: 0 };
     const r: any = kind === "EXAM" || kind === "TEST" ? await act(R, C, kind, text, R.usage) : await say(R, C, text, R.usage);
@@ -593,20 +627,20 @@ async function handle(req: Request): Promise<Response> {
   if (path === "/api/draft") {
     const R = await getEnc(safe(b.name));
     if ((R.submits || []).length) throw bad("이미 제출한 진료입니다");
-    const soap = Object.fromEntries([..."SOAP"].map((k) => [k, String((b.soap || {})[k] ?? "")]));
-    await db.encPatch(R.name, { draft: { soap, dx: String(b.dx || "").trim() } });
+    const { soap, soapFields } = soapInput(b);
+    await db.encPatch(R.name, { draft: { soap, soap_fields: soapFields, dx: String(b.diagnosis || b.dx || "").trim() } });
     return reply({ ok: true });
   }
   if (path === "/api/submit" || path === "/api/record/rescore") {
-    const dx = String(b.dx || "").trim();
+    const dx = String(b.diagnosis || b.dx || "").trim();
     if (!dx) throw bad("주진단을 적어 주세요.");
     const R = await getEnc(safe(b.name)), re = path === "/api/record/rescore";
     if (!re && (R.submits || []).length) throw bad("이미 제출한 진료입니다");
     if (re && !(R.submits || []).length) throw bad("아직 제출하지 않은 진료입니다");
     const C = await getCase(R.cid, true);
     R.usage = R.usage || { calls: 0, in: 0, out: 0 };
-    const soap = Object.fromEntries([..."SOAP"].map((k) => [k, String((b.soap || {})[k] ?? "")]));
-    await submit(R, C, soap, dx, R.usage, re);
+    const { soap, soapFields } = soapInput(b);
+    await submit(R, C, soap, soapFields, dx, R.usage, re);
     await saveEnc(R);
     return reply(await convView(R));
   }
