@@ -149,18 +149,6 @@ const db = {
   caseHistory: (cid: string, data: unknown) => both(
     async () => { await sql`insert into case_history (cid, data) values (${cid}, ${sql.json(data)})`; },
     async () => { await rest("POST", "case_history", { cid, data }, "return=minimal"); }),
-  medicalVersion: () => both(
-    async () => (await sql`select version, pack_id, content_sha256, metadata, updated_at from medical_kb_versions where active = true limit 1`)[0] ?? null,
-    async () => (await rest("GET", "medical_kb_versions?active=is.true&select=version,pack_id,content_sha256,metadata,updated_at&limit=1"))[0] ?? null),
-  medicalProfiles: () => both(
-    async () => await sql`select profile_id, canonical_ko, canonical_en, normalized_aliases, data, version from medical_kb_profiles order by canonical_ko`,
-    async () => await rest("GET", "medical_kb_profiles?select=profile_id,canonical_ko,canonical_en,normalized_aliases,data,version&order=canonical_ko")),
-  medicalExams: () => both(
-    async () => await sql`select exam_id, canonical_ko, normalized_aliases, data, version from medical_kb_exams order by canonical_ko`,
-    async () => await rest("GET", "medical_kb_exams?select=exam_id,canonical_ko,normalized_aliases,data,version&order=canonical_ko")),
-  medicalSources: () => both(
-    async () => await sql`select source_id, data, version from medical_kb_sources order by source_id`,
-    async () => await rest("GET", "medical_kb_sources?select=source_id,data,version&order=source_id")),
   failGet: (ip: string) => both(
     async () => (await sql`select n, until_ts from login_fails where ip = ${ip}`)[0] ?? null,
     async () => (await rest("GET", `login_fails?ip=eq.${q(ip)}&select=n,until_ts`))[0] ?? null),
@@ -221,37 +209,6 @@ const casesPayload = (rows: any[]) => ({
   cases: rows.map((r: any, i: number) => ({ no: i + 1, cid: r.cid, age: r.data.patient?.age, sex: r.data.patient?.sex, cc: r.data.patient?.chief_complaint, level: r.data.difficulty || "" })),
   max_turns: P.MAX_TURNS, max_min: MAX_MIN, maxlen: P.MAXLEN,
 });
-
-// 의학 DB 검색은 증례·정답과 독립적이다. 별칭은 배포할 때 같은 규칙으로 정규화한다.
-function normalizeMedicalTerm(value: unknown): string {
-  return String(value ?? "").normalize("NFC").toLocaleLowerCase("ko-KR").trim()
-    .replace(/[\s.·•_\-/()[\]{}]+/gu, "");
-}
-
-async function medicalKb(query: string) {
-  const [version, rows] = await Promise.all([db.medicalVersion(), db.medicalProfiles()]);
-  const key = normalizeMedicalTerm(query);
-  if (!key) {
-    return {
-      version,
-      count: rows.length,
-      profiles: rows.map((r: any) => ({ id: r.profile_id, canonical_ko: r.canonical_ko, canonical_en: r.canonical_en })),
-    };
-  }
-  const selected = rows.filter((r: any) => (r.normalized_aliases || []).includes(key));
-  const profileData = selected.map((r: any) => r.data);
-  const examIds = new Set<string>();
-  const sourceIds = new Set<string>();
-  for (const profile of profileData) {
-    for (const id of profile.exam_ids || []) examIds.add(String(id));
-    for (const mechanism of profile.mechanisms || []) for (const id of mechanism.exam_ids || []) examIds.add(String(id));
-    for (const id of profile.source_ids || []) sourceIds.add(String(id));
-  }
-  const exams = (await db.medicalExams()).filter((r: any) => examIds.has(r.exam_id)).map((r: any) => r.data);
-  for (const exam of exams) for (const id of exam.source_ids || []) sourceIds.add(String(id));
-  const sources = (await db.medicalSources()).filter((r: any) => sourceIds.has(r.source_id)).map((r: any) => r.data);
-  return { version, query, normalized: key, profiles: profileData, exams, sources };
-}
 
 // ───────────── OpenAI ─────────────
 type Usage = { calls: number; in: number; out: number };
@@ -614,7 +571,6 @@ async function handle(req: Request): Promise<Response> {
     if (!(await authed(req))) throw bad("비밀번호를 입력해 주세요.", 401);
     if (path === "/api/cases") return reply(casesPayload(await liveCases()));
     if (path === "/api/history") return reply({ rows: await history() });
-    if (path === "/api/medical-kb") return reply(await medicalKb(String(qp.q || qp.complaint || "")));
     if (path === "/api/conv") return reply(await convView(await getEnc(safe(qp.name))));
     if (path === "/api/admin/cases") {
       const rows = await liveCases();

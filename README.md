@@ -2,8 +2,6 @@
 
 대회 규칙·환자 상호작용·공개 샘플과 공식 평가의 차이·SOAP 고정 필드·제출 전 체크리스트는 [docs/NOVA_RULES_SOAP.md](docs/NOVA_RULES_SOAP.md)에 상세히 정리되어 있습니다.
 
-주호소에서 `병태생리 기전 → 증상·징후 → 확인 문진·진찰`로 이어지는 증례 비의존 의학 DB는 [medical-db/README.md](medical-db/README.md)와 `medical-db/cpx_core_v1.json`에 있습니다. 현재 증례의 정답·대본·체크리스트를 보지 않는 블라인드 선정 규칙으로 관리하며, 배포 시 Supabase의 별도 `medical_kb_*` 테이블에 시드됩니다.
-
 ## NOVA 2026 공개 샘플 검증
 
 N.O.V.A. 2026 공개 샘플 C01·C03·C10을 `fixtures/nova-samples-2026/`에 추가했고, CPX 저장 형식으로 변환한 케이스 맵은 `fixtures/nova-samples-cases.json`입니다. 공개 샘플 원문·모범 기록은 연습과 검증용이며 공식 평가 증례나 만점 답안이 아닙니다.
@@ -146,7 +144,6 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 **그 밖**
 | 요청 | 쓰임 |
 |---|---|
-| `GET /api/medical-kb?q=복통` | 일반 의학 DB에서 주호소의 기전·증상·진찰·근거 출처 조회. 증례 정답과 분리 |
 | `GET /api/conv?name=` | 진료 전체 (대화, 쓰다 만 SOAP, 제출 결과, `meta`) |
 | `GET /api/history` | 진료 목록 (`label`·`title`·점수 포함) |
 | `POST /api/draft` `{"name", "soap", "dx"}` | 제출 전 SOAP 저장 |
