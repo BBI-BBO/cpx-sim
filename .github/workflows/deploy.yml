@@ -51,6 +51,14 @@ jobs:
           python3 -c 'import json; print(json.dumps({"query": open("supabase/schema.sql", encoding="utf-8").read()}))' > /tmp/q.json
           curl -sS --fail-with-body -X POST "https://api.supabase.com/v1/projects/$REF/database/query" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @/tmp/q.json > /dev/null
+      - name: 의학 DB 검증·시드
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          python3 scripts/validate_medical_kb.py
+          python3 scripts/render_medical_kb_sql.py > /tmp/medical-kb.sql
+          python3 -c 'import json; print(json.dumps({"query": open("/tmp/medical-kb.sql", encoding="utf-8").read()}))' > /tmp/medical-kb.json
+          curl -sS --fail-with-body -X POST "https://api.supabase.com/v1/projects/$REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" --data @/tmp/medical-kb.json > /dev/null
       - name: 함수 비밀값 넣기
         if: steps.check.outputs.ready == 'true'
         env:

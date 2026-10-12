@@ -46,7 +46,57 @@ create table if not exists public.login_fails (
   until_ts timestamptz
 );
 
+-- 증례 정답과 분리된 주호소 중심 의학 지식층.
+-- 특정 case/truth/checklist 를 참조하지 않고 외부 교과서 근거로 버전 관리한다.
+create table if not exists public.medical_kb_versions (
+  version        text primary key,
+  pack_id        text not null,
+  content_sha256 text not null,
+  metadata       jsonb not null,
+  active         boolean not null default false,
+  updated_at     timestamptz not null default now()
+);
+
+create unique index if not exists medical_kb_one_active_idx
+  on public.medical_kb_versions (active) where active;
+
+create table if not exists public.medical_kb_sources (
+  source_id  text primary key,
+  data       jsonb not null,
+  version    text not null references public.medical_kb_versions(version),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.medical_kb_exams (
+  exam_id            text primary key,
+  canonical_ko       text not null,
+  normalized_aliases text[] not null default '{}',
+  data               jsonb not null,
+  version            text not null references public.medical_kb_versions(version),
+  updated_at         timestamptz not null default now()
+);
+
+create index if not exists medical_kb_exams_aliases_idx
+  on public.medical_kb_exams using gin (normalized_aliases);
+
+create table if not exists public.medical_kb_profiles (
+  profile_id         text primary key,
+  canonical_ko       text not null,
+  canonical_en       text not null,
+  normalized_aliases text[] not null default '{}',
+  data               jsonb not null,
+  version            text not null references public.medical_kb_versions(version),
+  updated_at         timestamptz not null default now()
+);
+
+create index if not exists medical_kb_profiles_aliases_idx
+  on public.medical_kb_profiles using gin (normalized_aliases);
+
 alter table public.cases        enable row level security;
 alter table public.case_history enable row level security;
 alter table public.encounters   enable row level security;
 alter table public.login_fails  enable row level security;
+alter table public.medical_kb_versions enable row level security;
+alter table public.medical_kb_sources  enable row level security;
+alter table public.medical_kb_exams    enable row level security;
+alter table public.medical_kb_profiles enable row level security;
