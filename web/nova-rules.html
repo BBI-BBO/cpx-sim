@@ -1,36 +1,42 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>NOVA 2026 규칙·SOAP 가이드</title>
-<style>
-:root{font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#172033;background:#f5f7fb;line-height:1.65}
-body{max-width:980px;margin:0 auto;padding:28px 18px 64px}a{color:#3157bd}h1{margin:0 0 6px;font-size:28px}h2{margin:30px 0 10px;font-size:20px}.muted{color:#68748b}.card{background:#fff;border:1px solid #dfe5ef;border-radius:14px;padding:20px;margin:16px 0;box-shadow:0 4px 18px #1720330b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.item{border:1px solid #e1e6ef;border-radius:10px;padding:12px}.item b{display:block;color:#3157bd;margin-bottom:3px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #e5e9f0;text-align:left;vertical-align:top}th{background:#f3f6fb}.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#eef2f8;color:#3157bd;font-family:ui-monospace,monospace;font-size:13px}.notice{background:#fff8e6;border-radius:9px;padding:12px;color:#6b5000}@media(max-width:650px){.grid{grid-template-columns:1fr}table{font-size:14px}}
-</style>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=arrow_back,menu_book,rule,stethoscope&display=block">
+<link rel="stylesheet" href="ui.css">
 </head>
 <body>
-<p><a href="index.html">← CPX 가상 환자</a> · <a href="nova-evaluate.html">NOVA ZIP 검증</a></p>
-<h1>NOVA 2026 규칙·SOAP 작성 가이드</h1>
-<p class="muted">공식 공개 문서와 공개 샘플을 기준으로 정리한 개발·복기용 안내입니다. 비공개 증례별 채점 프롬프트는 포함되지 않습니다.</p>
+<header class="subbar">
+  <a class="brand" href="index.html"><span class="ms f">stethoscope</span><span class="t">CPX 가상 환자</span></a>
+  <span class="spacer"></span>
+  <nav><a href="nova-evaluate.html"><span class="ms">rule</span>NOVA 샘플 검증</a><a class="on" href="nova-rules.html"><span class="ms">menu_book</span>규칙·SOAP 가이드</a></nav>
+</header>
+<main class="page">
+<header><h1>NOVA 2026 규칙·SOAP 작성 가이드</h1>
+<p class="meta">공식 공개 문서와 공개 샘플을 기준으로 정리한 개발·복기용 안내입니다. 비공개 증례별 채점 프롬프트는 포함되지 않습니다.</p></header>
 
-<section class="card"><h2>공식 자료</h2><p><a href="https://nova.snubhai.org/docs/">개발 가이드</a> · <a href="https://nova.snubhai.org/evaluation/">진행 및 평가</a> · <a href="https://nova.snubhai.org/rules/">참가 규칙</a></p></section>
+<section class="card pad sec"><h2>공식 자료</h2><p><a href="https://nova.snubhai.org/docs/">개발 가이드</a> · <a href="https://nova.snubhai.org/evaluation/">진행 및 평가</a> · <a href="https://nova.snubhai.org/rules/">참가 규칙</a></p></section>
 
-<section class="card"><h2>진료 상호작용 규칙</h2><table><thead><tr><th>행동</th><th>용도</th><th>핵심 제한</th></tr></thead><tbody>
+<section class="card pad sec"><h2>진료 상호작용 규칙</h2><table class="tbl"><thead><tr><th>행동</th><th>용도</th><th>핵심 제한</th></tr></thead><tbody>
 <tr><td><span class="tag">SAY</span></td><td>문진·설명·공감</td><td>한 턴에 하나, NFC 정규화 후 30 코드 포인트 이하</td></tr>
 <tr><td><span class="tag">EXAM</span></td><td>신체진찰</td><td>구체적인 진찰 동작 하나, 30 코드 포인트 이하</td></tr>
 <tr><td><span class="tag">TEST</span></td><td>혈액·영상 검사</td><td>본선만 가능, 검사 하나, 예선에서는 사용하지 않음</td></tr>
 <tr><td><span class="tag">DIAGNOSE</span></td><td>초진 기록·주진단 제출</td><td>S/O/A/P와 주진단 1개, 0턴, 제출 후 종료</td></tr>
-</tbody></table><p class="notice">증례당 최대 50턴입니다. 시작 정보와 활력징후 외의 환자 대본·결과표·모범 기록은 에이전트에 미리 공개되지 않습니다.</p></section>
+</tbody></table><p class="note">증례당 최대 50턴입니다. 시작 정보와 활력징후 외의 환자 대본·결과표·모범 기록은 에이전트에 미리 공개되지 않습니다.</p></section>
 
-<section class="card"><h2>공식 평가 영역</h2><div class="grid"><div class="item"><b>정보수집 · 25점</b>필요한 문진·진찰을 실제로 수행하고 S/O에 기록했는가</div><div class="item"><b>진단추론 · 15점</b>주진단·근거·감별진단의 타당성</div><div class="item"><b>검사·추적 · 10점</b>필요한 검사와 추적 계획</div><div class="item"><b>안전 · 15점</b>위험 신호·처치·안전망</div><div class="item"><b>의사소통 · 15점</b>이해하기 쉬운 설명과 환자 걱정 확인</div><div class="item"><b>효율 · 20점</b>중복·무관 행동과 모델 사용 비용 최소화</div></div><p class="muted">서버 대화·진찰·검사 로그와 제출한 SOAP·주진단을 함께 평가합니다. 질문하지 않은 내용을 기록해도 수행한 것으로 인정되지 않으며, 미제출·시간 초과는 0점 처리됩니다.</p></section>
+<section class="card pad sec"><h2>공식 평가 영역</h2><div class="grid2"><div class="cell"><b>정보수집 · 25점</b>필요한 문진·진찰을 실제로 수행하고 S/O에 기록했는가</div><div class="cell"><b>진단추론 · 15점</b>주진단·근거·감별진단의 타당성</div><div class="cell"><b>검사·추적 · 10점</b>필요한 검사와 추적 계획</div><div class="cell"><b>안전 · 15점</b>위험 신호·처치·안전망</div><div class="cell"><b>의사소통 · 15점</b>이해하기 쉬운 설명과 환자 걱정 확인</div><div class="cell"><b>효율 · 20점</b>중복·무관 행동과 모델 사용 비용 최소화</div></div><p class="meta" style="margin-top:12px">서버 대화·진찰·검사 로그와 제출한 SOAP·주진단을 함께 평가합니다. 질문하지 않은 내용을 기록해도 수행한 것으로 인정되지 않으며, 미제출·시간 초과는 0점 처리됩니다.</p></section>
 
-<section class="card"><h2>고정 SOAP 필드</h2><table><thead><tr><th>구분</th><th>필드</th><th>작성 원칙</th></tr></thead><tbody>
+<section class="card pad sec"><h2>고정 SOAP 필드</h2><table class="tbl"><thead><tr><th>구분</th><th>필드</th><th>작성 원칙</th></tr></thead><tbody>
 <tr><td>S</td><td><span class="tag">cc</span> 주호소<br><span class="tag">hpi</span> 현병력<br><span class="tag">pmh</span> 과거력·약물·알레르기<br><span class="tag">fh</span> 가족력<br><span class="tag">sh</span> 사회력<br><span class="tag">ros</span> 계통 문진</td><td>환자가 말했거나 실제로 확인한 양성·음성을 기록합니다.</td></tr>
 <tr><td>O</td><td><span class="tag">exam</span> 진찰 소견<br><span class="tag">tests</span> 검사 결과</td><td>실제로 시행·확인한 결과와 턴 번호를 기록합니다. 예선 검사 결과는 비워 둡니다.</td></tr>
 <tr><td>A</td><td><span class="tag">evidence</span> 근거<br><span class="tag">differential</span> 감별진단</td><td>주진단 필드는 없습니다. 주진단은 <code>diagnosis</code> 인자로 별도 제출하고, 감별은 <code>r/o 진단명 : 이유</code> 형식으로 가능성 순서대로 씁니다.</td></tr>
 <tr><td>P</td><td><span class="tag">tests</span> 추가 검사<br><span class="tag">treatment</span> 치료<br><span class="tag">disposition</span> 처치 결정<br><span class="tag">follow_up</span> 추적<br><span class="tag">education</span> 환자 교육</td><td>앞으로 할 계획입니다. 실제 시행 결과처럼 쓰지 않습니다. 교육 기록과 실제 SAY 설명은 별도 평가됩니다.</td></tr>
 </tbody></table></section>
 
-<section class="card"><h2>제출 크기·채점 해석</h2><ul><li>기록 전체는 UTF-8 100,000바이트 이하, 별도 주진단은 500바이트 이하입니다. 필드별 별도 길이 제한은 없습니다.</li><li>공개 샘플 검증 점수는 참고용입니다.</li><li>공식 평가의 내부 증례별 기준·프롬프트는 공개되지 않습니다.</li><li>현재 앱은 공식 필드를 칸별로 저장·표시하고, 대화 로그·턴별 평가·영역별 점수를 함께 복기하도록 구성합니다.</li></ul></section>
+<section class="card pad sec"><h2>제출 크기·채점 해석</h2><ul><li>기록 전체는 UTF-8 100,000바이트 이하, 별도 주진단은 500바이트 이하입니다. 필드별 별도 길이 제한은 없습니다.</li><li>공개 샘플 검증 점수는 참고용입니다.</li><li>공식 평가의 내부 증례별 기준·프롬프트는 공개되지 않습니다.</li><li>현재 앱은 공식 필드를 칸별로 저장·표시하고, 대화 로그·턴별 평가·영역별 점수를 함께 복기하도록 구성합니다.</li></ul></section>
+</main>
 </body>
 </html>

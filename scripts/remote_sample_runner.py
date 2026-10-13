@@ -80,8 +80,10 @@ class TraceClient:
 
 class LivePublisher:
     """Upsert one live CPX encounter after every public action."""
-    def __init__(self, api: str, password: str, fixture: dict, case_id: str, run_id: str, encounter_name: str):
+    def __init__(self, api: str, password: str, fixture: dict, case_id: str, run_id: str, encounter_name: str,
+                 zip_meta: dict | None = None):
         self.api, self.password = api, password
+        self.zip_meta = zip_meta or {}
         self.fixture, self.case_id = fixture, case_id
         self.run_id, self.encounter_name = run_id, encounter_name
         self.token = ""
@@ -99,7 +101,8 @@ class LivePublisher:
                       "events": trace.events, "record": trace.record, "diagnosis": trace.diagnosis,
                       "score": None, "session": None}
             encounter = _encounter_from_remote(self.case_id, remote, self.fixture, self.run_id,
-                                               encounter_name=self.encounter_name, finalized=finalized)
+                                               encounter_name=self.encounter_name, finalized=finalized,
+                                               zip_meta=self.zip_meta or None)
             _json_request(self.api.rstrip("/") + "/api/admin/import", "POST", {"encounters": [encounter]}, self.token)
         except Exception as exc:
             msg = f"{type(exc).__name__}: {exc}"
@@ -135,8 +138,12 @@ def main() -> int:
         fixture_data = json.loads(Path(args.fixture).read_text(encoding="utf-8"))
         fixture = fixture_data.get(args.display_case_id, fixture_data)
         run_id = args.encounter_name.rsplit("_", 1)[-1]
+        try:  # ZIP 이름·크기·sha256 (evaluate_submission 이 넘김) → 진료 기록의 라벨·제목·메모
+            zip_meta = json.loads(os.environ.get("NOVA_PUBLISH_META") or "{}")
+        except ValueError:
+            zip_meta = {}
         publisher = LivePublisher(os.environ.get("NOVA_PUBLISH_API", ""), os.environ.get("NOVA_PUBLISH_PASSWORD", ""),
-                                  fixture, args.display_case_id, run_id, args.encounter_name) if os.environ.get("NOVA_PUBLISH_API") else None
+                                  fixture, args.display_case_id, run_id, args.encounter_name, zip_meta) if os.environ.get("NOVA_PUBLISH_API") else None
         trace = TraceClient(client, args.display_case_id, initial.get("initial") or session.get("initial") or {}, publisher)
         client.ready()
         if publisher:

@@ -6,87 +6,12 @@
 <title>CPX 가상 환자</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,forum,groups,help,info,insights,library_books,logout,menu,menu_book,monitor_heart,more_vert,person,playlist_add,refresh,remove,report,rule,save,science,search,send,sentiment_dissatisfied,stethoscope,thumb_up,timer,unfold_more,warning&display=block">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=account_circle,add,arrow_back,article,assignment_turned_in,block,cancel,chat,check,check_circle,checklist,close,data_object,delete,edit,edit_note,error,expand_more,fact_check,forum,groups,help,info,insights,label,label_off,library_books,logout,menu,menu_book,monitor_heart,more_vert,pending,person,playlist_add,refresh,remove,report,rule,save,schedule,science,search,send,sentiment_dissatisfied,stethoscope,sync_problem,thumb_up,timer,unfold_more,warning&display=block">
+<link rel="stylesheet" href="ui.css">
 <script src="config.js"></script>
 <script>window.SP_CONFIG = window.SP_CONFIG || {api: ""};  /* GitHub Pages 판: api 에 Supabase 함수 주소 */</script>
 <style>
-:root{
-  --bg:#f8f9fb; --surface:#fff; --s1:#f3f5f8; --s2:#eceff4; --s3:#e1e5ec;
-  --on:#1b1d22; --on2:#505668; --on3:#7b8193;
-  --line:#e3e6ec; --line2:#cfd4dd;
-  --pri:#3456c6; --on-pri:#fff; --pri-c:#e3e9ff; --on-pri-c:#17307a;
-  --ok:#1d7a4e; --ok-c:#dcf3e6; --warn:#8a5600; --warn-c:#fdecc8; --bad:#b42318; --bad-c:#fde8e6;
-  --exam-c:#e4f4ec; --on-exam-c:#155c3b; --test-c:#fff0dc; --on-test-c:#7a4700;
-  --scrim:rgba(15,18,25,.42); --shadow:0 8px 28px rgba(16,24,40,.16),0 2px 6px rgba(16,24,40,.06);
-  --r:6px; --r2:8px; --r3:12px;
-  --appbar:60px; --drawer:296px;
-}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#111318; --surface:#181b21; --s1:#1d2128; --s2:#242932; --s3:#2d333e;
-  --on:#e6e8ee; --on2:#adb4c3; --on3:#818899;
-  --line:#2a2f38; --line2:#3b414d;
-  --pri:#aabcff; --on-pri:#0e2160; --pri-c:#2b3f86; --on-pri-c:#e0e6ff;
-  --ok:#83d9ab; --ok-c:#173b2a; --warn:#f3c370; --warn-c:#3d2e12; --bad:#ffb4ab; --bad-c:#4a1e1b;
-  --exam-c:#173b2a; --on-exam-c:#a8e8c5; --test-c:#3d2e12; --on-test-c:#f8d394;
-  --scrim:rgba(0,0,0,.6); --shadow:0 8px 28px rgba(0,0,0,.5); }}
-:root[data-theme="dark"]{
-  --bg:#111318; --surface:#181b21; --s1:#1d2128; --s2:#242932; --s3:#2d333e;
-  --on:#e6e8ee; --on2:#adb4c3; --on3:#818899;
-  --line:#2a2f38; --line2:#3b414d;
-  --pri:#aabcff; --on-pri:#0e2160; --pri-c:#2b3f86; --on-pri-c:#e0e6ff;
-  --ok:#83d9ab; --ok-c:#173b2a; --warn:#f3c370; --warn-c:#3d2e12; --bad:#ffb4ab; --bad-c:#4a1e1b;
-  --exam-c:#173b2a; --on-exam-c:#a8e8c5; --test-c:#3d2e12; --on-test-c:#f8d394;
-  --scrim:rgba(0,0,0,.6); --shadow:0 8px 28px rgba(0,0,0,.5); }
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-y:scroll;touch-action:manipulation}  /* 스크롤바 자리를 늘 잡아 화면이 옆으로 흔들리지 않게 */
-body{margin:0;background:var(--bg);color:var(--on);font:16px/1.6 "Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;letter-spacing:-.003em;-webkit-font-smoothing:antialiased}
 body[data-view="conv"]{overflow:hidden}
-h1{font-size:23px;line-height:1.3;font-weight:700;margin:0;letter-spacing:-.01em}
-h2{font-size:18px;line-height:1.4;font-weight:700;margin:0}
-h3{font-size:16px;font-weight:700;margin:0 0 10px}
-p{margin:0}
-a{color:inherit}
-button{font:inherit;color:inherit}
-.meta{font-size:14px;color:var(--on2)}
-.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;font-feature-settings:"liga";-webkit-font-smoothing:antialiased;font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24;user-select:none;flex:none;overflow:hidden;width:1em}
-.ms.f{font-variation-settings:"FILL" 1,"wght" 400,"GRAD" 0,"opsz" 24}
-[hidden]{display:none!important}
-
-/* ── 버튼·칩·입력 ── */
-.btn{height:38px;padding:0 16px;border-radius:var(--r);border:0;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;text-decoration:none;flex:none;transition:background .15s}
-.btn .ms{font-size:20px;margin-left:-3px}
-.btn.filled{background:var(--pri);color:var(--on-pri)}
-.btn.filled:hover{background:color-mix(in srgb,var(--pri) 88%,#000)}
-.btn.tonal{background:var(--pri-c);color:var(--on-pri-c)}
-.btn.tonal:hover{background:color-mix(in srgb,var(--pri-c) 85%,var(--pri))}
-.btn.outline{background:transparent;border:1px solid var(--line2);color:var(--on)}
-.btn.text{background:transparent;color:var(--pri);padding:0 10px}
-.btn.outline:hover,.btn.text:hover{background:color-mix(in srgb,var(--pri) 8%,transparent)}
-.btn.danger{background:var(--bad);color:#fff}
-.btn.block{width:100%;height:46px;font-size:16px}
-.btn:disabled{opacity:.38;cursor:default}
-.iconbtn{width:38px;height:38px;border-radius:var(--r);border:0;background:transparent;color:var(--on2);display:inline-grid;place-items:center;cursor:pointer;flex:none;transition:background .15s}
-.iconbtn:hover{background:var(--s2)}
-.chip{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:4px;background:var(--s2);color:var(--on2);font-size:14px;font-weight:500;white-space:nowrap}
-.chip .ms{font-size:18px}
-.chip.sm{height:22px;padding:0 7px;font-size:12.5px}
-.chip.lv{margin-left:6px;vertical-align:1px}
-.chip.g{background:var(--ok-c);color:var(--ok)} .chip.y{background:var(--warn-c);color:var(--warn)} .chip.r{background:var(--bad-c);color:var(--bad)} .chip.p{background:var(--pri-c);color:var(--on-pri-c)}
-.inp{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line2);border-radius:var(--r);background:var(--surface);color:var(--on);font:inherit;font-size:16px;line-height:1.55}
-.inp:focus{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 16%,transparent)}
-textarea.inp{resize:vertical;min-height:76px}
-select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--on2) 50%),linear-gradient(135deg,var(--on2) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
-.fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.fld label{font-size:14px;font-weight:600;color:var(--on2)}
-.fld .hint{font-weight:400;color:var(--on3)}
-.seg{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;height:38px;flex:none}
-.seg button{border:0;background:transparent;padding:0 16px;font-size:15px;font-weight:500;cursor:pointer}
-.seg button+button{border-left:1px solid var(--line2)}
-.seg button.on{background:var(--pri-c);color:var(--on-pri-c);font-weight:600}
-.search{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:var(--r);background:var(--s2);color:var(--on3)}
-.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--on);font:inherit;font-size:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r2)}
-.pad{padding:18px 20px}
 
 /* ── 상단바 ── */
 .appbar{position:fixed;top:0;left:0;right:0;height:var(--appbar);display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--bg);border-bottom:1px solid var(--line);z-index:30}
@@ -120,6 +45,17 @@ body.drawer-hidden .drawer{transform:translateX(-100%)}
 .newbtn{width:100%;height:42px;justify-content:flex-start;padding:0 14px}
 .drawer-list{flex:1;overflow-y:auto;padding:0 8px 10px;scrollbar-gutter:stable;overscroll-behavior:contain}
 .grp{font-size:13px;font-weight:600;color:var(--on3);padding:14px 10px 4px}
+.grp.sub{font-size:12px;font-weight:500;padding:8px 10px 2px}
+.lgrp{margin-top:6px}
+.grp-h{display:flex;align-items:center;gap:8px;width:100%;padding:8px 8px;border:0;border-radius:var(--r);background:transparent;cursor:pointer;text-align:left;color:var(--on2)}
+.grp-h:hover{background:var(--s2)}
+.grp-h>.ms{font-size:19px;color:var(--on3)}
+.grp-h>.chev{transition:transform .15s}
+.grp-h[aria-expanded="false"]>.chev{transform:rotate(-90deg)}
+.grp-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.grp-n{font-size:14.5px;font-weight:700;color:var(--on);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp-m{font-size:12.5px;color:var(--on3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp-b{padding-left:10px;margin-left:16px;border-left:1px solid var(--line)}
 .ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r);text-decoration:none;cursor:pointer;border:0;background:transparent;width:100%;text-align:left}
 .ni:hover{background:var(--s2)}
 .ni.on{background:var(--pri-c);color:var(--on-pri-c)}
@@ -773,24 +709,54 @@ $("#newBtn").onclick = e => {
 function navItem(r){
   const href = "#c/" + r.name, one = PSEL !== "all";
   const t = r.title || (one ? `${fmtWhen(r.name)} 진료` : `${caseLabel(r.case)} · ${r.cc || caseOf(r.case)?.cc || ""}`);
-  const m = (r.label && !LSEL ? r.label + " · " : "") + (one ? `${r.mode || ""} · ${r.turns}턴${r.dx ? " · " + r.dx : ""}` : `${fmtWhen(r.name)} · ${r.mode || ""} · ${r.turns}턴`);
+  const m = one ? `${fmtWhen(r.name)} · ${r.turns}턴${r.dx ? " · " + r.dx : ""}` : `${fmtWhen(r.name)} · ${r.mode || ""} · ${r.turns}턴`;
   const right = r.live ? `<span class="live-badge"><i></i>진행 중</span>` : `<span class="score-badge ${r.total == null ? "pending" : scoreCls(r.total)}">${scoreLabel(r.total)}</span>`;
   return `<a class="ni${prevHash && prevHash.startsWith(href) && (prevHash === href || prevHash[href.length] === "/") ? " on" : ""}" href="${esc(href)}"><div class="ni-main"><div class="ni-t">${esc(t)}</div><div class="ni-m">${esc(m)}</div></div>${right}</a>`;
+}
+/* 사이드바: 실험 라벨별로 묶어 접고 펼친다 (라벨 없는 진료는 맨 아래). 묶음마다 횟수·평균 점수·주진단 정확도.
+   펼침 상태는 이 브라우저에 기억한다 (저장소를 못 쓰면 기억만 안 할 뿐 그대로 동작) */
+const GRP_KEY = "sp_groups_open";
+let GOPEN = (() => { try { const o = JSON.parse(store.get(GRP_KEY) || "{}"); return o && typeof o === "object" ? o : {}; } catch(e){ return {}; } })();
+function saveGroups(){ try { store.set(GRP_KEY, JSON.stringify(GOPEN)); } catch(e){} }
+function groupStats(rows){
+  const done = rows.filter(r => !r.live && r.total != null), acc = rows.filter(r => !r.live && r.accuracy != null);
+  return {n: rows.length, live: rows.filter(r => r.live).length, pending: rows.filter(r => !r.live && r.total == null).length,
+    avg: done.length ? Math.round(done.reduce((a, r) => a + r.total, 0) / done.length) : null,
+    acc: acc.length ? Math.round(acc.reduce((a, r) => a + r.accuracy, 0) / acc.length) : null};
+}
+function groupHTML(key, rows, open, cur){
+  const st = groupStats(rows), name = key || "라벨 없음";
+  const m = [`${st.n}회`, st.avg != null ? `평균 ${st.avg}점` : "", st.acc != null ? `정확도 ${st.acc}%` : "", st.pending ? `미채점 ${st.pending}` : ""].filter(Boolean).join(" · ");
+  let body = "";
+  if (open) {
+    const live = rows.filter(r => r.live), rest = rows.filter(r => !r.live);
+    body = live.map(navItem).join("");
+    if (key) body += rest.map(navItem).join("");
+    else { let g = null; for (const r of rest) { const k = dayGroup(r.name); if (k !== g) { body += `<div class="grp sub">${k}</div>`; g = k; } body += navItem(r); } }
+  }
+  return `<div class="lgrp"><button class="grp-h" data-g="${esc(key)}" aria-expanded="${open}" title="${esc(name)}">${I("expand_more").replace('class="ms"', 'class="ms chev"')}${I(key ? "label" : "label_off")}
+    <span class="grp-t"><span class="grp-n">${esc(name)}</span><span class="grp-m">${esc(m)}</span></span>${st.live ? `<span class="live-badge"><i></i>${st.live}</span>` : ""}</button>
+    ${open ? `<div class="grp-b">${body}</div>` : ""}</div>`;
 }
 function renderSide(){
   renderPsel(); renderLbl();
   const rows = HIST.filter(r => (PSEL === "all" || r.case === PSEL) && (!LSEL || r.label === LSEL));
-  let out = "", g = null;
-  const live = rows.filter(r => r.live);
-  if (live.length) out += `<div class="grp">진행 중</div>` + live.map(navItem).join("");
-  for (const r of rows.filter(r => !r.live)) {
-    const k = dayGroup(r.name);
-    if (k !== g) { out += `<div class="grp">${k}</div>`; g = k; }
-    out += navItem(r);
-  }
+  const cur = (/^#c\/([^/]+)/.exec(prevHash || "") || [])[1] || "";
+  const groups = new Map();  // HIST 는 최근 것부터: 묶음도 최근에 쓴 라벨부터, 라벨 없음은 맨 아래
+  for (const r of rows) { const k = r.label || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+  const keys = [...groups.keys()].sort((a, b) => (a === "") - (b === ""));
+  const out = keys.map(k => {
+    const g = groups.get(k);
+    const open = k in GOPEN ? !!GOPEN[k] : keys.length === 1 || g.some(r => r.live || r.name === cur);
+    return groupHTML(k, g, open, cur);
+  }).join("");
   $("#sideHist").innerHTML = out || `<div class="side-empty">${LSEL ? "이 라벨의 진료가 없습니다" : "아직 이 환자의 진료가 없습니다"}</div>`;
   $("#adminLink").classList.toggle("on", /^#(admin|edit\/)/.test(prevHash || ""));
 }
+$("#sideHist").addEventListener("click", e => {
+  const b = e.target.closest(".grp-h"); if (!b) return;
+  GOPEN[b.dataset.g] = b.getAttribute("aria-expanded") !== "true"; saveGroups(); renderSide();
+});
 
 /* ───── 화면 이동 (#주소로 오가며, 브라우저 뒤로 가기도 된다) ───── */
 function go(h){ if (decodeURIComponent(location.hash) === h) route(); else location.hash = h; }
@@ -830,7 +796,8 @@ function showRules(){
   const lim = CFG.max_min ? `${CFG.max_min}분 안에 끝내야 합니다 (넘기면 0점)` : "대회 공개 규정상 증례당 30분입니다";
   dialog({title:"진료 규칙", body:`<ul class="rules">
     <li>${I("chat")}<div><b>대화 · 1턴</b><p>질문·설명·공감을 ${CFG.maxlen}자 이하로, 한 번에 하나씩 합니다.</p></div></li>
-    <li>${I("stethoscope")}<div><b>진찰 · 1턴</b><p>진찰 동작 하나를 문장으로 요청합니다. 진찰 목록은 주지 않습니다.</p></div></li>
+    <li>${I("person")}<div><b>환자는 짧게 하나씩</b><p>시작 정보와 대본만 알고, 물은 것 하나에 20자 안팎으로 답합니다. 여러 개를 물으면 첫 질문에만 답하고, 한꺼번에 말해 달라고 하면 "한 번에 하나씩 물어봐 주세요."라고 합니다. 묻지 않은 것은 먼저 말하지 않습니다.</p></div></li>
+    <li>${I("stethoscope")}<div><b>진찰 · 1턴</b><p>진찰 동작 하나를 문장으로 요청합니다. 진찰 목록은 주지 않습니다. 전신·부위 전체·여러 동작을 묶거나 진찰이 아닌 요청은 반려(1턴)됩니다.</p></div></li>
     <li>${I("science")}<div><b>검사 · 1턴</b><p>본선에서만 쓸 수 있습니다. 검사 하나씩 요청합니다.</p></div></li>
     <li>${I("block")}<div><b>규칙 위반 · 유형별 턴 처리</b><p>${CFG.maxlen}자 초과·빈 내용·잘못된 진찰은 대회 규정에 따라 1턴을 사용하고, 제공하지 않는 TEST는 턴을 쓰지 않습니다.</p></div></li>
     <li>${I("edit_note")}<div><b>SOAP 기록 · 제출</b><p>S·O·A·P와 주진단 1개를 쓰고 제출하면 진료가 끝나고 채점합니다.</p></div></li>
@@ -1255,9 +1222,30 @@ function soapResultHTML(sub, judge){
     }
     h += `</div>`;
   }
-  const dxVerdict = judge?.accuracy == null ? "warn" : judge.accuracy >= 90 ? "good" : judge.accuracy >= 40 ? "warn" : "bad";
-  h += `<div class="soap-section-label">Dx</div><div class="soap-field-row"><b>주진단</b><mark ${markAttrs(dxVerdict, "주진단", judge?.accuracy == null ? "아직 우리 채점기가 실행되지 않았습니다" : "정답 " + (sub.truth || "") + (judge?.accuracy_note ? " · " + judge.accuracy_note : ""))}><strong>${esc(sub.dx || "")}</strong></mark></div></div>`;
+  const ds = dxScore(judge), dxVerdict = !ds ? "warn" : ds >= 4 ? "good" : ds === 3 ? "warn" : "bad";
+  h += `<div class="soap-section-label">Dx</div><div class="soap-field-row"><b>주진단</b><mark ${markAttrs(dxVerdict, "주진단", !ds ? "아직 우리 채점기가 실행되지 않았습니다" : `${ds}/5 ${DX_LABEL[ds]} · 정답 ` + (sub.truth || "") + (judge?.accuracy_note ? " · " + judge.accuracy_note : ""))}><strong>${esc(sub.dx || "")}</strong></mark></div></div>`;
   return h;
+}
+
+/* 주진단 5점 척도 (Nori et al. 2025): 5 정확 · 4 매우 근접 · 3 밀접 관련 · 2 관련 · 1 무관. 4 이상이 정답.
+   dx_score 가 없는 예전 채점은 accuracy 구간(90·70·40·10)에서 거꾸로 구한다. */
+const DX_LABEL = {5: "정확", 4: "매우 근접", 3: "밀접 관련", 2: "관련", 1: "무관"};
+function dxScore(j){
+  const n = Math.round(Number(j?.dx_score));
+  if (DX_LABEL[n]) return n;
+  const a = j?.accuracy;
+  return a == null ? 0 : a >= 90 ? 5 : a >= 70 ? 4 : a >= 40 ? 3 : a >= 10 ? 2 : 1;
+}
+/* 기록 사실 대조 (ACI-Bench 식): 근거 있는 사실 · 지어낸 기록 · 기록 누락 */
+function recordFactsHTML(rf){
+  if (!rf || typeof rf !== "object") return "";
+  const g = rf.grounded || [], f = rf.fabricated || [], m = rf.missed || [];
+  if (!g.length && !f.length && !m.length) return "";
+  const row = (x, cls, tag, extra) => `<div class="ck"><div class="ck-main"><div class="ck-t">${esc(x.fact || "")}</div><div class="ck-m">${x.sec ? `<span>${esc(x.sec)}</span>` : ""}${extra ? `<span>${esc(extra)}</span>` : ""}</div></div><span class="chip sm ${cls}">${tag}</span></div>`;
+  const keyN = g.filter(x => x.key === true).length;
+  return `<details class="acc"><summary>${I("fact_check")}기록 사실 대조<span class="meta">근거 ${g.length}${keyN ? ` (핵심 ${keyN})` : ""} · 지어냄 ${f.length} · 누락 ${m.length}</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">
+    <p class="meta">기록에 쓴 사실을 대화·진찰과 맞춰 봤습니다. 정보수집·기록 = 7 × 핵심 근거 ÷ (핵심 근거 + 누락), 안전·지어낸 기록 1건당 -1 (최대 -3). 묻지 않고 쓴 내용은 수집한 것으로 치지 않습니다.</p>
+    ${f.map(x => row(x, "r", "지어낸 기록", x.why)).join("")}${m.map(x => row(x, "y", "기록 누락", x.turn)).join("")}${g.map(x => row(x, "g", x.key ? "근거 · 핵심" : "근거", x.turn)).join("")}</div></details>`;
 }
 
 /* 결과 탭: 턴·시간·점수 먼저, 나머지는 펼쳐서 */
@@ -1268,19 +1256,19 @@ function renderResult(){
     $("#toSoap").onclick = () => setTab("soap"); return;
   }
   const sub = v.submit, j = sub.judge || {}, pf = sub.patient || {}, sc = sub.scores || {}, u = sub.usage || {};
-  const hasScore = sub.total != null && Number.isFinite(Number(sub.total));
-  const acc = j.accuracy ?? 0, [vc, vi, vt] = !hasScore ? ["y","schedule","채점 대기"] : acc >= 90 ? ["g","check_circle","주진단 정답"] : acc >= 40 ? ["y","error","주진단 부분 정답"] : ["r","cancel","주진단 오답"];
+  const st = scoreState(sub), hasScore = st === "ok";
+  const ds = dxScore(j), dxt = `주진단 ${ds}/5 · ${DX_LABEL[ds] || ""}`, [vc, vi, vt] = st === "failed" ? ["r","sync_problem","채점 실패"] : !hasScore ? ["y","schedule","채점 전"] : ds >= 4 ? ["g","check_circle",dxt] : ds === 3 ? ["y","error",dxt] : ["r","cancel",dxt];
   const mt = v.meta || {}, expNote = mt.label || mt.memo ? `<div class="exp-note"><div class="k">${I("science")}${esc([mt.label, mt.title].filter(Boolean).join(" · ") || "메모")}</div>${mt.memo ? `<div class="m">${esc(mt.memo)}</div>` : ""}</div>` : "";
   let h = `<div class="pane">${expNote}<div class="stats">
-      <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${!hasScore ? "on2" : scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${hasScore ? sub.total : "미채점"}<small>/ 100</small></div></div>
+      <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${!hasScore ? "on2" : scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${hasScore ? sub.total : st === "failed" ? "실패" : "채점 전"}${hasScore ? "<small>/ 100</small>" : ""}</div></div>
       <div class="stat"><div class="k">사용 턴</div><div class="v">${sub.turns}<small>/ ${v.max_turns}</small></div></div>
       <div class="stat"><div class="k">반려</div><div class="v">${sub.rejected}<small>회</small></div></div></div>
     ${sub.overtime ? `<div class="callout">${I("timer")}<b>시간 초과로 무효(0점) 처리됐습니다</b></div>` : ""}
-    ${!hasScore ? `<div class="callout">${I("info")}<div><b>NOVA 공개 샘플 서버는 실행만 검증하고 점수는 반환하지 않습니다.</b><br>현재 기록은 대화·SOAP 제출만 저장된 상태입니다. <b>고쳐서 다시 채점</b>을 누르면 우리 CPX 채점기로 참고 점수를 계산합니다.</div></div>` : ""}
+    ${!hasScore ? unscoredHTML(v, st) : ""}
     <div class="dxrow"><span class="chip ${vc}">${I(vi, 1)}${vt}</span><span><span class="lbl">제출</span>${esc(sub.dx)}</span><span><span class="lbl">정답</span>${esc(sub.truth)}</span></div>
-    <div class="sec-h"><h3>영역별 점수</h3></div>
+    ${hasScore ? `<div class="sec-h"><h3>영역별 점수</h3></div>
     <div class="domains">${DOMAINS.map(([d, mx]) => { const x = sc[d] ?? 0, r = x / mx;
-      return `<button class="dom" aria-expanded="false"><span class="dn">${d}</span><span class="bar"><i class="${r >= .7 ? "g" : r >= .4 ? "y" : "r"}" style="width:${Math.round(100 * r)}%"></i></span><span class="ds">${x}<small> / ${mx}</small></span>${I("expand_more")}</button><div class="dom-why" hidden>${domWhy(d, j)}</div>`; }).join("")}</div>`;
+      return `<button class="dom" aria-expanded="false"><span class="dn">${d}</span><span class="bar"><i class="${r >= .7 ? "g" : r >= .4 ? "y" : "r"}" style="width:${Math.round(100 * r)}%"></i></span><span class="ds">${x}<small> / ${mx}</small></span>${I("expand_more")}</button><div class="dom-why" hidden>${domWhy(d, j)}</div>`; }).join("")}</div>` : ""}`;
   const missed = (j.red_flags || []).filter(x => !x.checked);
   const legend = (arr) => { const c = k => arr.filter(x => vcls(x.verdict) === k).length;
     return `<div class="hl-legend"><span class="good"><i></i>좋음 ${c("good")}</span><span class="warn"><i></i>아쉬움 ${c("warn")}</span><span class="bad"><i></i>틀림 ${c("bad")}</span></div>`; };
@@ -1289,33 +1277,77 @@ function renderResult(){
   const split = sub.soap_split;
   if (missed.length) h += `<div class="callout">${I("report", 1)}<div><b>놓치면 위험한 것 ${missed.length}개를 확인하지 않았습니다</b><ul>${missed.map(x => `<li>${esc(x.item)}</li>`).join("")}</ul></div></div>`;
   const miss = [...(j.soap_top || []), ...(j.soap_more || [])];
-  h += `<div class="sec-h"><h3>SOAP 기록 · 공식 필드별</h3>${split && sents.length ? legend(sents) : `<span class="meta">다시 채점하면 문장별 평가</span>`}</div>
+  const later = hasScore ? "다시 채점하면" : "채점하면";
+  h += `<div class="sec-h"><h3>SOAP 기록 · 공식 필드별</h3>${split && sents.length ? legend(sents) : `<span class="meta">${later} 문장별 평가</span>`}</div>
     <div class="orig-box res-box">${soapResultHTML(sub, j)}</div>
     ${miss.length ? `<details class="acc"><summary>${I("playlist_add")}빠진 것·고칠 점<span class="meta">${miss.length}개</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${miss.map(missItem).join("")}</div></details>` : ""}`;
   const tnotes = {}; for (const n of j.turn_notes || []) tnotes[+n.turn] = n;
-  h += `<div class="sec-h"><h3>대화</h3>${(j.turn_notes || []).length ? legend(j.turn_notes) : `<span class="meta">다시 채점하면 턴별 평가</span>`}</div>
+  h += `<div class="sec-h"><h3>대화</h3>${(j.turn_notes || []).length ? legend(j.turn_notes) : `<span class="meta">${later} 턴별 평가</span>`}</div>
     <div class="orig-box res-box"><div class="log">${convHTML(v, tnotes)}</div></div>`;
   const ck = [...(j.checklist || [])], order = {"지어낸 기록":0, "미수집":1, "기록 누락":2, "정상":3};
   ck.sort((a, b) => (order[a.tag] ?? 9) - (order[b.tag] ?? 9));
   const tc = t => t === "정상" ? "g" : t === "지어낸 기록" ? "r" : "y";
   if (ck.length) h += `<details class="acc"><summary>${I("checklist")}체크리스트<span class="meta">문제 ${ck.filter(c => c.tag && c.tag !== "정상").length} / ${ck.length}</span>${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${ck.map(c => `<div class="ck"><div class="ck-main"><div class="ck-t">${esc(c.item)}</div>
       <div class="ck-m"><span class="${c.asked ? "yes" : "no"}">${I(c.asked ? "check" : "close")}물음</span><span class="${c.recorded ? "yes" : "no"}">${I(c.recorded ? "check" : "close")}기록</span>${c.turn && c.turn !== "턴 없음" ? `<span>${esc(c.turn)}</span>` : ""}</div></div>${c.tag ? `<span class="chip sm ${tc(c.tag)}">${esc(c.tag)}</span>` : ""}</div>`).join("")}</div></details>`;
-  h += `<details class="acc"><summary>${I("person")}환자 평가${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">
+  h += recordFactsHTML(j.record_facts);
+  h += `<details class="acc"><summary>${I("person")}환자 평가${pf.ppi ? "" : `<span class="meta">${later} 환자 설문</span>`}${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${pf.ppi || (pf.good || []).length ? "" : `<p class="meta">아직 환자 설문이 없습니다.</p>`}
       <ul class="lst">${(pf.good || []).map(x => `<li><span class="g">${I("thumb_up")}</span><span>${esc(x)}</span></li>`).join("")}${(pf.regret || []).map(x => `<li><span class="r">${I("sentiment_dissatisfied")}</span><span>${esc(x)}</span></li>`).join("")}</ul>
       ${pf.wish ? `<div class="quote">${esc(pf.wish)}</div>` : ""}
       ${pf.ppi ? `<div class="ppi">${Object.entries(pf.ppi).map(([k, x]) => `<div>${esc(k)}${(pf.ppi_turn || {})[k] ? ` <span class="meta" style="font-size:13px">${esc(pf.ppi_turn[k])}</span>` : ""}</div><span class="meter">${[1,2,3].map(i => `<i class="${+x >= i ? "on" : ""}"></i>`).join("")}</span>`).join("")}</div>` : ""}
     </div></details>`;
-  h += `<details class="acc"><summary>${I("menu_book")}모범 답안${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${refHTML(v.reference)}</div></details>`;
+  h += `<details class="acc"><summary>${I("menu_book")}모범 답안${I("expand_more").replace('class="ms"', 'class="ms chev"')}</summary><div class="acc-b">${refHTML(v.reference, v.model_record)}</div></details>`;
   h += (v.submits || []).length > 1 ? `<p class="foot-meta">이전 채점 ${v.submits.slice(0, -1).map(x => x.total).join(", ")}점</p></div>` : `</div>`;
   body().innerHTML = h;
   $$("#cvBody .dom").forEach(b => b.onclick = () => { const w = b.nextElementSibling, o = w.hidden; w.hidden = !o; b.setAttribute("aria-expanded", o); });
+  const rb = $("#rescoreNow"), eb = $("#rescoreEdit");
+  if (rb) rb.onclick = () => rescoreAsIs(v);
+  if (eb) eb.onclick = () => { soapEdit = true; setTab("soap"); };
+}
+/* 점수 상태: ok = 채점 결과 있음 · failed = 채점 모델이 빈 답(또는 점수만 있고 피드백이 없음) · pending = 아직 채점 안 함 (ZIP·NOVA 실행에서 들여온 기록 등) */
+function scoreState(sub){
+  const j = sub?.judge || {}, has = sub && sub.total != null && Number.isFinite(Number(sub.total));
+  const feedback = !!(j.sub || (j.checklist || []).length || (j.soap_sentences || []).length || (j.turn_notes || []).length);
+  if (sub?.judge_error) return "failed";
+  if (has) return feedback || j.official ? "ok" : "failed";
+  return "pending";
+}
+function unscoredHTML(v, st){
+  const sub = v.submit, nova = /_NOVA_/.test(v.name) || v.meta?.zip;
+  const why = st === "failed" ? `<b>채점 실패</b> — ${esc(sub.judge_error || "채점 결과에 피드백이 없습니다")}. 점수와 턴별·SOAP 피드백을 다시 받으려면 다시 채점하세요.`
+    : `<b>채점 전</b> — ${nova ? "NOVA 공개 샘플 서버·개발 키트는 실행만 검증하고 점수를 주지 않아, 대화와 SOAP만 들어와 있습니다." : "아직 우리 CPX 채점기로 채점하지 않았습니다."} 다시 채점하면 같은 대화·SOAP로 팀 CPX 참고 점수와 피드백을 만듭니다.`;
+  const can = !!String(sub.dx || "").trim();
+  return `<div class="callout" style="background:var(--${st === "failed" ? "bad" : "warn"}-c);color:var(--${st === "failed" ? "bad" : "warn"})">${I(st === "failed" ? "sync_problem" : "pending")}<div style="flex:1"><div style="color:var(--on)">${why}</div>
+    ${can ? "" : `<div class="meta" style="margin-top:4px">주진단이 비어 있어 바로 채점할 수 없습니다. SOAP를 고쳐 주진단을 적어 주세요.</div>`}
+    <div class="row-btns" style="justify-content:flex-start;margin-top:10px">${can ? `<button class="btn filled" id="rescoreNow">${I("refresh")}다시 채점</button>` : ""}<button class="btn outline" id="rescoreEdit">${I("edit_note")}SOAP 고쳐서 채점</button></div></div></div>`;
+}
+async function rescoreAsIs(v){
+  const sub = v.submit || {}, soap_fields = soapFieldsOf(sub), dx = String(sub.dx || "").trim();
+  if (!dx) { toast("주진단이 없어 채점할 수 없습니다", true); return; }
+  setBusy(true, "채점하는 중 (1~2분)");
+  try {
+    const nv = await api("/api/record/rescore", {name:v.name, soap: sub.soap || soapSectionsOf(soap_fields), soap_fields, note:soap_fields, dx, diagnosis:dx});
+    if (nv.submit && !nv.submit.soap_fields) nv.submit.soap_fields = soap_fields;
+    CONVC.set(v.name, nv); upsertRow(nv); if (CV === v || CV?.name === v.name) showConv(nv, "result");
+    toast(scoreState(nv.submit) === "ok" ? "채점했습니다" : "채점 결과가 비어 있습니다. 잠시 뒤 다시 해 보세요", scoreState(nv.submit) !== "ok");
+  } catch(e){ fail(e); } finally { setBusy(false); }
 }
 function domWhy(d, j){
   const sb = (j.sub || {})[d], why = (j.reasons || {})[d];
-  const parts = sb ? Object.entries(sb).map(([k, x]) => `${esc(k)} ${esc(x)}`).join(" · ") : d === "의사소통" ? "환자 설문 8항목 평균 × 5" : "";
+  const ds = dxScore(j), dxNote = d === "진단추론" && ds ? ` (5점 척도 ${ds}/5 ${DX_LABEL[ds]})` : "";
+  const parts = sb ? Object.entries(sb).map(([k, x]) => `${esc(k)} ${esc(x)}${k === "주진단" ? dxNote : ""}`).join(" · ") : d === "의사소통" ? "환자 설문 8항목 평균 × 5" : "";
   return `${parts ? `<div class="sub">${parts}</div>` : ""}${why ? esc(why) : ""}`;
 }
-function refHTML(r){
+const MR_LABEL = {cc:"주호소", hpi:"현병력", pmh:"과거력·약물·알레르기", fh:"가족력", sh:"사회력", ros:"계통 문진", exam:"진찰 소견", tests:"검사", evidence:"근거", differential:"감별진단", treatment:"치료", disposition:"처치 결정", follow_up:"추적", education:"환자 교육"};
+function refHTML(r, mr){
+  if (mr && typeof mr === "object" && ["S","O","A","P"].some(k => mr[k])) {  // 대회 형식 모범 기록 (공식 S/O/A/P 칸 그대로)
+    let h = `<div class="ref">${mr.diagnosis ? `<h4>주진단 · ${esc(mr.diagnosis)}</h4>` : ""}<div class="soap-result">`;
+    for (const sec of ["S","O","A","P"]) {
+      const f = mr[sec] || {}, rows = Object.entries(typeof f === "object" ? f : {"": f}).filter(([, x]) => String(x || "").trim());
+      if (!rows.length) continue;
+      h += `<div class="soap-section-label">${sec}</div><div>${rows.map(([k, x]) => `<div class="soap-field-row">${k ? `<b><code>${esc(k)}</code> ${esc(MR_LABEL[k] || "")}</b>` : ""}<div>${esc(x)}</div></div>`).join("")}</div>`;
+    }
+    return h + `</div></div>`;
+  }
   if (!r) return `<p class="meta">없음</p>`;
   const ul = a => a && a.length ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
   let h = `<div class="ref">`;
@@ -1349,7 +1381,7 @@ async function loadAdmin(){
       <div class="ph-act"><button class="btn filled" id="newCase">${I("add")}<span class="t">새 증례</span></button></div></div>
     <div class="card list">${j.rows.map(r => `<div class="case-row" data-c="${esc(r.cid)}"><span class="num">${r.no}</span>
       <div class="cr-main"><div class="cr-t">${esc(r.cc)}${lvChip(r.level)} <span class="meta" style="font-weight:400">· ${esc(r.who)}</span></div><div class="cr-m">정답 · ${esc(r.truth)}</div></div>
-      <span class="chip sm ${/완료/.test(r.status || "") ? "g" : "y"} hide-xs">${shortStatus(r.status)}</span>
+      ${r.format === "예전 형식" ? `<span class="chip sm hide-xs" title="대회 형식 칸(대본·진찰 결과표)이 없어 예전 칸에서 바꿔 읽습니다">예전 형식</span>` : ""}<span class="chip sm ${/완료/.test(r.status || "") ? "g" : "y"} hide-xs">${shortStatus(r.status)}</span>
       <button class="iconbtn" data-more="${esc(r.cid)}" title="더 보기">${I("more_vert")}</button></div>`).join("") || `<div class="side-empty">증례가 없습니다</div>`}</div>`;
   $$("#v-admin .case-row").forEach(row => row.onclick = e => { if (!e.target.closest("[data-more]")) go("#edit/" + row.dataset.c); });
   $$("#v-admin [data-more]").forEach(b => b.onclick = e => { e.stopPropagation(); const cid = b.dataset.more; menu(b, [
@@ -1383,7 +1415,7 @@ function newFromPmc(){
 
 /* 편집기: 증례 JSON 을 탭별 양식으로 고친다 */
 let ED = null, EDcid = null, edDirty = false, edTab = "basic";
-const ED_TABS = [["card","증례 카드"], ["sample","NOVA 샘플"], ["basic","기본"], ["script","대본·문답·연기"], ["exam","진찰·검사"], ["check","체크리스트"], ["ref","모범 답안"]];
+const ED_TABS = [["nova","대회 형식"], ["basic","기본"], ["card","증례 카드"], ["script","예전 대본·문답"], ["exam","검사·예전 진찰"], ["check","체크리스트"], ["ref","채점용 모범 답안"]];
 const getP = (o, path) => path.split(".").reduce((a, k) => a == null ? a : a[k], o);
 function setP(o, path, val){ const ks = path.split("."); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null) a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks.at(-1)] = val; }
 const F = {
@@ -1420,41 +1452,50 @@ function cardHTML(c){
     ${(c.beliefs || []).length ? `<h3 style="margin-top:18px">환자가 잘못 알거나 모르는 것</h3><ul class="lst">${c.beliefs.map(x => `<li><span>${I("help")}</span><span>${esc(x.belief || "")} <span class="chip sm">${esc(x.kind || "짐작")}</span><br><span style="color:var(--on3);font-size:14px">실제: ${esc(x.truth || "")} · 확인: ${esc(x.check || "")}</span></span></li>`).join("")}</ul>` : ""}
     ${(c.qa_sources || []).length ? `<h3 style="margin-top:18px">보강 출처</h3><ul class="lst">${c.qa_sources.map(x => `<li><span>${I("article")}</span><span>${esc(x.id || "")} <a href="${esc(x.url || "#")}" target="_blank" rel="noopener">${esc(x.title || x.url || "")}</a></span></li>`).join("")}</ul>` : ""}</div>`;
 }
-function novaSampleHTML(c){
-  const p = c.patient || {}, start = c.start_information || {}, r = c.reference || {}, a = r.A || {}, plan = r.P || {};
-  const list = xs => Array.isArray(xs) && xs.length ? `<ul>${xs.map(x => `<li>${esc(typeof x === "string" ? x : `${x.item || x.dx || x.name || ""}${x.why ? ` — ${x.why}` : ""}`)}</li>`).join("")}</ul>` : `<p class="meta">비어 있음</p>`;
-  const fieldRows = (title, fields) => `<section class="card pad ed"><h3>${title}</h3><div class="sample-fields">${fields.map(([k, v]) => `<div class="sample-field"><b>${esc(k)}</b><div>${v ? esc(v) : '<span class="chip sm r">비어 있음</span>'}</div></div>`).join("")}</div></section>`;
-  const exam = (c.exam || []).map(x => `<tr><td>${esc(x.name || "")}</td><td>${esc(x.finding || "")}</td></tr>`).join("");
-  return `<div class="card pad ed"><div class="hl-legend"><span class="chip sm g">NOVA 공개 샘플</span><span class="meta">공식 샘플의 시작 정보·대본·진찰표·S/O/A/P 구조</span></div>
-    ${fieldRows("시작 정보", [["성별/나이", `${p.sex || ""}/${p.age || ""}세`], ["주호소", p.chief_complaint], ["첫마디", p.opening || start.opening], ["활력징후", c.vitals || start.vital_signs]])}
-    <section class="card pad ed"><h3>환자 대본 <small>가상 환자 모델이 보는 원문</small></h3><div class="sample-prose">${esc(Array.isArray(c.script?.["공개 샘플 대본"]) ? c.script["공개 샘플 대본"].join("\n\n") : (c.patient_script || ""))}</div></section>
-    <section class="card pad ed"><h3>진찰 결과표 <small>${(c.exam || []).length}개 · 요청한 진찰 하나에 하나의 결과</small></h3><table class="cardt"><tr><th>진찰</th><th>결과</th></tr>${exam || '<tr><td colspan="2"><span class="chip sm r">비어 있음</span></td></tr>'}</table></section>
-    ${fieldRows("S · Subjective", [["cc", r.S?.[0] || ""], ["hpi", (r.S || []).slice(1).join("\n")], ["pmh / fh / sh / ros", (r.S || []).join("\n")]])}
-    ${fieldRows("O · Objective", [["진찰 소견", (r.O || []).join("\n")], ["검사 결과", (r.O || []).filter(x => /검사|test/i.test(x)).join("\n")]])}
-    <section class="card pad ed"><h3>A · Assessment <small>주진단 하나 + 근거 + 감별</small></h3><h4>주진단</h4><p>${esc(a.main || c.truth || "")}</p><h4>근거</h4>${list(a.rationale)}<h4>감별진단</h4>${list(a.ddx)}</section>
-    <section class="card pad ed"><h3>P · Plan</h3><h4>추가 검사</h4>${list(plan.tests)}<h4>치료·처치</h4>${list([...(plan.treatment || []), ...(plan.safety || [])])}<h4>추적</h4>${list(plan.followup)}<h4>설명·교육</h4>${list(plan.education || r.communication)}</section>
-    <section class="card pad ed"><h3>공개 샘플 체크리스트</h3>${list(c.checklist || [])}</section></div>`;
+/* 대회 형식: 공개 샘플 case.json 과 같은 칸. 가상 환자는 시작 정보와 대본만 알고, 진찰은 진찰표의 한 행으로 답한다 */
+const MR_FIELDS = {S:["cc","hpi","pmh","fh","sh","ros"], O:["exam","tests"], A:["evidence","differential"], P:["tests","treatment","disposition","follow_up","education"]};
+function isUnified(c){ return !!String(c.patient_script || "").trim() && (c.exam_results || []).some(r => r && r.exam && r.result); }
+function novaFormatHTML(c){
+  const d = c._derived, legacy = !isUnified(c) && d;
+  const prev = legacy ? `<div class="card pad ed" style="border-color:var(--warn)"><h3>${I("warning")}예전 형식 증례 <small>진료에는 지금 아래처럼 쓰입니다</small></h3>
+      <p class="meta" style="margin-bottom:10px">예전 칸(대본·문답·생각·걱정·진찰)을 그대로 이어 붙여 읽은 것입니다. 새 사실은 더하지 않습니다. <b>이 내용으로 채우기</b> → 다듬기 → 저장하면 대회 형식으로 바뀝니다. (여러 증례는 <code>scripts/convert_cases.py</code>)</p>
+      <div class="sample-prose" style="max-height:260px">${esc(d.patient_script || "")}</div>
+      <p class="meta" style="margin:8px 0">진찰표 ${(d.exam_results || []).length}행</p>
+      <button class="btn tonal" id="edFill">${I("playlist_add")}이 내용으로 채우기</button></div>` : "";
+  return prev + `<div class="card pad ed"><h3>시작 정보 <small>start_information · 의사가 처음 받는 것은 이것뿐</small></h3>
+      ${F.area("첫마디 (opening)", "start_information.opening")}${F.area("활력징후 (vital_signs)", "start_information.vital_signs")}</div>
+    <div class="card pad ed"><h3>환자 대본 <small>patient_script · 가상 환자가 아는 전부 (시작 정보와 함께). 한 덩어리 글</small></h3>
+      <div class="fld"><textarea class="inp" data-p="patient_script" data-k="text" style="min-height:320px" placeholder="환자가 1인칭으로 아는 사실: 현병력·동반/없는 증상·과거력·약·가족력·사회력·걱정">${esc(c.patient_script || "")}</textarea></div>
+      <p class="meta">대본에 없어도 환자가 당연히 알 만한 것은 '보통 그런 문제가 없는 사람'처럼 답하고, 정확한 수치·의학 용어만 모른다고 합니다 (개발 키트 규칙).</p></div>
+    <div class="card pad ed"><h3>진찰 결과표 <small>exam_results · 요청한 진찰 하나에 한 행. 표에 없는 진찰은 나이·성별에 맞는 구체적 소견으로 한 번 지어 냄</small></h3>
+      ${F.rows("진찰", "exam_results", [{k:"exam", h:"진찰 (한국어 (English))", w:"1fr"}, {k:"result", h:"결과", w:"2fr", long:true}])}</div>
+    <div class="card pad ed"><h3>모범 기록 <small>model_record · 선택. 공식 S/O/A/P 칸 + 주진단</small></h3>
+      ${Object.entries(MR_FIELDS).map(([sec, ks]) => `<h3 style="margin-top:6px"><span class="soap-k">${sec}</span></h3><div class="g2">${ks.map(k => F.area(`${k} ${MR_LABEL[k] || ""}`, `model_record.${sec}.${k}`)).join("")}</div>`).join("")}
+      <div class="g2">${F.text("주진단 (diagnosis)", "model_record.diagnosis")}${F.text("정답 (truth)", "truth")}</div></div>`;
 }
-function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = data._unsaved ? "basic" : String(data.source || "").startsWith("NOVA") ? "sample" : "card"; go("#edit/" + cid); }
+function openEditor(cid, data){ ED = data; EDcid = cid; edDirty = false; edTab = data._unsaved ? "basic" : "nova"; go("#edit/" + cid); }
 async function openEditorRoute(cid){
-  if (!(ED && EDcid === cid)) { ED = await api("/api/admin/case?cid=" + encodeURIComponent(cid)); EDcid = cid; edDirty = false; edTab = ED._unsaved ? "basic" : String(ED.source || "").startsWith("NOVA") ? "sample" : "card"; }
+  if (!(ED && EDcid === cid)) { ED = await api("/api/admin/case?cid=" + encodeURIComponent(cid)); EDcid = cid; edDirty = false; edTab = ED._unsaved ? "basic" : "nova"; }
   show("edit"); renderEditor();
 }
 function renderEditor(){
   const sc = ED.script || (ED.script = {});
   const scKeys = [...new Set(["현병력","동반증상","없는증상","과거력","약","알레르기","가족력","사회력","여성력","이전진료", ...Object.keys(sc)])];
   ED.acting = ED.acting || {}; ED.reference = ED.reference || {}; ED.reference.A = ED.reference.A || {}; ED.reference.P = ED.reference.P || {};
+  // 첫마디·활력징후는 대회 형식 칸(start_information)에 둔다. 저장하면 서버가 예전 칸(patient.opening·vitals)도 같은 값으로 맞춘다
+  ED.start_information = ED.start_information || {opening: ED.patient?.opening || "", vital_signs: ED.vitals || ""};
+  const legacyNote = isUnified(ED) ? `<div class="soap-guide">이 증례는 대회 형식(대본·진찰 결과표)이 있어 진료에는 <b>대회 형식</b> 탭만 쓰입니다. 여기 칸은 기록용으로 남아 있습니다.</div>` : "";
   let b = "";
-  if (edTab === "card") b = cardHTML(ED);
-  else if (edTab === "sample") b = novaSampleHTML(ED);
+  if (edTab === "nova") b = novaFormatHTML(ED);
+  else if (edTab === "card") b = cardHTML(ED);
   else if (edTab === "basic") b = `<div class="card pad ed"><h3>기본</h3><div class="g2">${F.text("정답 (최종 진단)", "truth")}${F.sel("상태", "status", ["작성 중", "초안 (의학과 검수 전)", "검수 중", "검수 완료"])}${F.sel("난이도", "difficulty", ["", ...LEVELS])}${F.text("PMC 번호", "pmcid")}${F.text("한 줄 소개", "intro")}</div></div>
     <div class="card pad ed"><h3>환자 <small>진료 시작 때 보이는 것</small></h3><div class="g2">${F.text("이름", "patient.name")}${F.text("나이", "patient.age")}${F.sel("성별", "patient.sex", ["여", "남"])}${F.text("주호소", "patient.chief_complaint")}</div>
-      ${F.area("첫마디 (이름·나이·주호소만)", "patient.opening")}${F.area("활력징후", "vitals")}</div>`;
-  else if (edTab === "script") b = `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
+      ${F.area("첫마디 (시작 정보 opening)", "start_information.opening")}${F.area("활력징후 (시작 정보 vital_signs)", "start_information.vital_signs")}</div>`;
+  else if (edTab === "script") b = legacyNote + `<div class="card pad ed"><h3>대본 <small>환자가 아는 것 · 여기 없는 증상은 '없다'고 답함</small></h3><div class="g2">${scKeys.map(k => F.lines(k, "script." + k)).join("")}</div></div>
     <div class="card pad ed"><h3>자주 묻는 것 <small>의사가 물으면 이대로 대답 · 출처는 검수용</small></h3>${F.rows("문답", "qa", [{k:"q", h:"질문 요지", w:"1fr"}, {k:"a", h:"환자 대답", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "음성"]}, {k:"why", h:"근거", w:"1.2fr", long:true}])}</div>
     <div class="card pad ed"><h3>잘못 알거나 모르는 것 <small>환자는 생각만 알고, 채점은 실제·확인 방법까지 봄</small></h3>${F.rows("항목", "beliefs", [{k:"belief", h:"환자 생각", w:"1.4fr", long:true}, {k:"kind", h:"종류", w:"92px", opts:["짐작", "들은 말"]}, {k:"truth", h:"실제", w:"1.6fr", long:true}, {k:"check", h:"확인 방법", w:"1.2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강"]}])}</div>
     <div class="card pad ed"><h3>연기</h3><div class="g2">${F.area("성격·말투", "acting.성격·말투")}${F.area("감정", "acting.감정")}${F.lines("걱정", "acting.걱정")}${F.lines("기대", "acting.기대")}</div></div>`;
-  else if (edTab === "exam") b = `<div class="card pad ed"><h3>진찰 소견 <small>목록에 없는 진찰은 '특이 소견 없음'</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "정상"]}])}</div>
+  else if (edTab === "exam") b = legacyNote + `<div class="card pad ed"><h3>예전 진찰 소견 <small>대회 형식 진찰 결과표가 없을 때만 쓰임</small></h3>${F.rows("진찰", "exam", [{k:"name", h:"진찰 이름", w:"1fr"}, {k:"finding", h:"소견", w:"2fr", long:true}, {k:"src", h:"출처", w:"92px", opts:["원문", "보강", "정상"]}])}</div>
     <div class="card pad ed"><h3>검사 결과 <small>본선에서만</small></h3>${F.rows("검사", "tests", [{k:"name", h:"검사 이름", w:"1fr"}, {k:"result", h:"결과", w:"2fr", long:true}])}</div>`;
   else if (edTab === "check") b = `<div class="card pad ed"><h3>체크리스트 <small>한 줄에 한 가지</small></h3>${F.rows("항목", "checklist", [{k:"item", h:"확인할 항목", w:"2fr"}, {k:"type", h:"종류", w:"100px", opts:["SAY", "EXAM"]}, {k:"weight", h:"가중치", w:"80px", opts:[1, 2, 3], num:true}, {k:"why", h:"이유", w:"2fr"}])}</div>`;
   else b = `<div class="card pad ed"><h3>모범 답안 <small>검사 전, 대화·진찰만 한 시점</small></h3><div class="g2">${F.lines("S", "reference.S")}${F.lines("O", "reference.O")}</div>
@@ -1476,9 +1517,17 @@ function renderEditor(){
   $$("#v-edit [data-add]").forEach(x => x.onclick = () => { const a = getP(ED, x.dataset.add) || []; a.push({}); setP(ED, x.dataset.add, a); edDirty = true; renderEditor(); });
   $$("#v-edit [data-del]").forEach(x => x.onclick = () => { const a = getP(ED, x.dataset.del) || []; a.splice(+x.dataset.i, 1); edDirty = true; renderEditor(); });
   $("#edBack").onclick = () => go("#admin");
+  const fill = $("#edFill");
+  if (fill) fill.onclick = () => {
+    const d = JSON.parse(JSON.stringify(ED._derived || {}));
+    if (!String(ED.patient_script || "").trim()) ED.patient_script = d.patient_script || "";
+    if (!(ED.exam_results || []).length) ED.exam_results = d.exam_results || [];
+    ED.start_information = {opening: ED.start_information?.opening || d.start_information?.opening || "", vital_signs: ED.start_information?.vital_signs || d.start_information?.vital_signs || ""};
+    edDirty = true; renderEditor(); toast("채웠습니다. 다듬은 뒤 저장하세요");
+  };
   $("#edSave").onclick = saveCase;
   $("#edJson").onclick = () => {
-    const {_unsaved, ...clean} = ED;
+    const {_unsaved, _derived, ...clean} = ED;
     dialog({title:`증례 ${EDcid} JSON`, cls:"wide", body:`<textarea class="inp" id="jsonTa" style="min-height:58dvh;font:13.5px/1.5 ui-monospace,Menlo,monospace">${esc(JSON.stringify(clean, null, 1))}</textarea>`,
       actions:[{label:"닫기", value:null}, {label:"양식에 반영", kind:"filled", onClick:(close, el) => {
         try { const u = ED._unsaved; ED = JSON.parse($("#jsonTa", el).value); if (u) ED._unsaved = true; edDirty = true; close(null); renderEditor(); toast("반영했습니다. 저장을 눌러야 파일에 씁니다"); }
@@ -1487,10 +1536,10 @@ function renderEditor(){
   };
 }
 async function saveCase(){
-  const {_unsaved, ...data} = ED;
+  const {_unsaved, _derived, ...data} = ED;
   try {
     await api("/api/admin/case/save", {cid:EDcid, data});
-    delete ED._unsaved; edDirty = false; toast("저장했습니다 (이전 판은 보관)"); renderEditor();
+    delete ED._unsaved; if (isUnified(ED)) delete ED._derived; edDirty = false; toast("저장했습니다 (이전 판은 보관)"); renderEditor();
     await loadCases(); renderSide();
   } catch(e){ fail(e); }
 }

@@ -6,3 +6,8 @@ __pycache__/
 supabase/.temp/
 scripts/.clinic_token.json
 submission-runs/
+
+# 검증 전용 증례·정답 (공개 저장소에 올리지 않음)
+fixtures/cpx-eval-2026/
+fixtures/cpx-eval-cases.json
+fixtures/nova-cases-2026/

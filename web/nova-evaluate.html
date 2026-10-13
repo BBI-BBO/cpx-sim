@@ -1,45 +1,130 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>NOVA 샘플 검증</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=check_circle,cancel,folder_zip,info,insights,menu_book,play_arrow,rule,schedule,stethoscope,upload_file,warning&display=block">
+<link rel="stylesheet" href="ui.css">
 <style>
-:root{font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#172033;background:#f5f7fb;line-height:1.55}
-body{max-width:860px;margin:0 auto;padding:32px 18px 64px}h1{margin:0 0 6px;font-size:28px}h2{margin:28px 0 10px;font-size:19px}.muted{color:#697386}.card{background:#fff;border:1px solid #dfe5ef;border-radius:14px;padding:20px;margin:16px 0;box-shadow:0 4px 18px #1720330b}.drop{display:flex;align-items:center;justify-content:center;min-height:130px;border:2px dashed #9aabd2;border-radius:12px;background:#f8faff;text-align:center;cursor:pointer}.drop:hover{border-color:#3456c6;background:#f0f4ff}input[type=file]{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:8px;padding:10px 15px;font-size:15px;font-weight:700;cursor:pointer;background:#3456c6;color:#fff}button.secondary{background:#e7edff;color:#17307a}button:disabled{opacity:.45;cursor:not-allowed}.file{font-weight:700;margin-top:10px}.pill{display:inline-block;border-radius:999px;padding:3px 10px;background:#edf1f7;color:#526079;font-size:13px}.pill.ok{background:#dcf3e6;color:#17623d}.pill.bad{background:#fde8e6;color:#a02118}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.case{border:1px solid #dfe5ef;border-radius:10px;padding:12px}.case b{display:block}.case small{color:#697386}.error{white-space:pre-wrap;color:#a02118;background:#fff2f0;padding:10px;border-radius:8px}.notice{background:#fff8e6;padding:12px;border-radius:8px;color:#705000}.criteria{display:grid;grid-template-columns:1fr auto;gap:4px 18px}.bar{height:8px;background:#e8edf5;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:#3456c6}@media(max-width:600px){.grid{grid-template-columns:1fr}.criteria{grid-template-columns:1fr auto}}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:130px;border:2px dashed var(--line2);border-radius:var(--r2);background:var(--s1);text-align:center;cursor:pointer;color:var(--on2);padding:16px}
+.drop:hover,.drop.over{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 6%,var(--s1))}
+.drop .ms{font-size:32px;color:var(--pri)}
+.drop small{color:var(--on3)}
+input[type=file]{display:none}
+.file{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:600}
+.file .meta{font-weight:400}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.crit{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.crit span{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r);font-size:15px}
+.crit b{color:var(--pri)}
+.cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:12px}
+.case{border:1px solid var(--line);border-radius:var(--r2);padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:6px}
+.case-h{display:flex;align-items:center;gap:8px}
+.case-h b{flex:1;font-size:16px}
+.case .score{font-size:24px;font-weight:800;line-height:1.2}
+.case .score small{font-size:14px;color:var(--on3);font-weight:600;margin-left:2px}
+.score.g{color:var(--ok)} .score.y{color:var(--warn)} .score.r{color:var(--bad)} .score.n{color:var(--on3);font-size:16px}
+.status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--on2);font-size:15px}
+pre.log{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,Menlo,monospace;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:12px;max-height:360px;overflow:auto;margin:12px 0 0}
 </style>
 </head>
 <body>
-<p><a href="index.html">← CPX 가상 환자</a></p>
-<h1>NOVA 샘플 검증</h1>
-<p class="muted">스타터 ZIP을 올려 제출 계약을 검사하고 C01·C03·C10 공개 샘플에서 실행합니다. <a href="nova-rules.html">대회 규칙·SOAP 가이드 보기</a></p>
+<header class="subbar">
+  <a class="brand" href="index.html"><span class="ms f">stethoscope</span><span class="t">CPX 가상 환자</span></a>
+  <span class="spacer"></span>
+  <nav><a class="on" href="nova-evaluate.html"><span class="ms">rule</span>NOVA 샘플 검증</a><a href="nova-rules.html"><span class="ms">menu_book</span>규칙·SOAP 가이드</a></nav>
+</header>
+<main class="page">
+<header><h1>NOVA 샘플 검증</h1>
+<p class="meta">스타터 ZIP을 올려 제출 계약을 검사하고 C01·C03·C10 공개 샘플에서 실행합니다. 실행한 진료는 ZIP 이름을 실험 라벨로 붙여 CPX 화면 사이드바에 모입니다.</p></header>
 
-<section class="card">
-  <h2>1. 제출 ZIP 선택</h2>
-  <label class="drop" for="zip">ZIP 파일을 여기에 놓거나 클릭해서 선택<br><small>루트에 run.py·requirements.txt · 압축 50MB 이하</small></label>
+<section class="card pad sec">
+  <h2><span class="ms">folder_zip</span>1. 제출 ZIP 선택</h2>
+  <label class="drop" for="zip" id="drop"><span class="ms">upload_file</span>ZIP 파일을 여기에 놓거나 눌러서 고르기<small>루트에 run.py·requirements.txt · 압축 50MB 이하</small></label>
   <input id="zip" type="file" accept=".zip,application/zip">
-  <div id="file" class="file muted">선택된 파일 없음</div>
-  <div class="actions"><button id="validate" class="secondary" disabled>제출 형식 검사</button><button id="evaluate" disabled>3건 실행</button></div>
+  <div id="file" class="file meta">고른 파일 없음</div>
+  <div class="actions"><button id="validate" class="btn outline" disabled><span class="ms">rule</span>제출 형식 검사</button><button id="evaluate" class="btn filled" disabled><span class="ms">play_arrow</span>3건 실행</button></div>
   <div id="validation"></div>
 </section>
 
-<section class="card">
-  <h2>2. 대회와 같은 로컬 규칙</h2>
-  <div class="criteria"><span>정보수집</span><b>25점</b><span>진단추론</span><b>15점</b><span>검사·추적</span><b>10점</b><span>안전</span><b>15점</b><span>의사소통</span><b>15점</b><span>효율</span><b>20점</b></div>
-  <p class="muted">증례당 50턴 · SAY/EXAM 30 NFC 코드 포인트 · 한 턴에 하나 · 예선 TEST 불가 · 확인한 내용만 S/O에 기록.</p>
-  <div class="notice">개발 키트는 공식 채점을 하지 않습니다. 실행 성공 여부와 transcript/record를 확인한 뒤 실제 NOVA 서버의 샘플 검증에서 참고 점수를 받으세요.</div>
+<section class="card pad sec">
+  <h2><span class="ms">info</span>2. 대회와 같은 규칙</h2>
+  <div class="crit"><span>정보수집<b>25</b></span><span>진단추론<b>15</b></span><span>검사·추적<b>10</b></span><span>안전<b>15</b></span><span>의사소통<b>15</b></span><span>효율<b>20</b></span></div>
+  <p class="meta">증례당 50턴 · SAY/EXAM 30 NFC 코드 포인트 · 한 턴에 하나 · 예선 TEST 불가 · 확인한 내용만 S/O에 기록.</p>
+  <div class="note warn"><span class="ms">warning</span><span>개발 키트와 공개 샘플 서버는 공식 채점을 하지 않습니다. 여기 점수는 같은 대화·SOAP를 우리 CPX 채점기로 다시 채점한 <b>팀 CPX 참고 점수</b>입니다.</span></div>
 </section>
 
-<section class="card" id="result" hidden><h2>3. 실행 결과</h2><div id="status" class="muted"></div><div id="cases" class="grid"></div><pre id="log" class="notice" hidden></pre></section>
+<section class="card pad sec" id="result" hidden>
+  <h2><span class="ms">insights</span>3. 실행 결과</h2>
+  <div id="status" class="status"></div>
+  <div id="cases" class="cases"></div>
+  <div id="note"></div>
+  <pre id="log" class="log" hidden></pre>
+</section>
+</main>
 <script>
-const $=s=>document.querySelector(s), zip=$("#zip"), file=$("#file"), validateBtn=$("#validate"), evalBtn=$("#evaluate"), validation=$("#validation"), result=$("#result"), status=$("#status"), cases=$("#cases"), log=$("#log");
-let selected=null, valid=false, current="";
-zip.onchange=()=>{selected=zip.files[0]||null; valid=false; file.textContent=selected?`${selected.name} · ${(selected.size/1024/1024).toFixed(2)}MB`:'선택된 파일 없음'; validateBtn.disabled=!selected; evalBtn.disabled=true; validation.innerHTML='';};
-function showValidation(v){valid=!!v.valid; evalBtn.disabled=!valid; validation.innerHTML=`<p><span class="pill ${valid?'ok':'bad'}">${valid?'제출 가능':'제출 거부'}</span> ${v.file_count}개 파일 · ${(v.uncompressed_bytes/1024/1024).toFixed(2)}MB</p>${v.errors?.length?`<div class="error">${v.errors.join('\n')}</div>`:''}${v.warnings?.length?`<p class="muted">${v.warnings.join('<br>')}</p>`:''}`;}
-async function send(path){const r=await fetch('/api/submission/'+path,{method:'POST',headers:{'Content-Type':'application/zip','X-Filename':selected.name},body:selected});const j=await r.json();if(!r.ok&&!j.validation)throw Error(j.error||'업로드 실패');return j;}
-validateBtn.onclick=async()=>{validateBtn.disabled=true;try{showValidation((await send('validate')).validation);}catch(e){validation.innerHTML=`<div class="error">${e.message}</div>`;}finally{validateBtn.disabled=false;}};
-function render(j){result.hidden=false;status.textContent=`상태: ${j.status||'확인 중'} · 실행 ID ${j.run_id||current}`;cases.innerHTML=(j.cases||[]).map(c=>`<div class="case"><b>${c.case_id}</b><span class="pill ${c.status==='passed'?'ok':c.status==='failed'?'bad':''}">${c.status}</span><small>${c.turns==null?'':`${c.turns}턴 · Doctor ${c.doctor_calls??'-'}회 · ${c.seconds??'-'}초`}</small></div>`).join('');if(j.error){log.hidden=false;log.textContent=j.error;}else if(j.cases?.some(c=>c.output_tail)){log.hidden=false;log.textContent=j.cases.map(c=>`--- ${c.case_id} ---\n${c.output_tail}`).join('\n');}}
-async function poll(){try{const j=await (await fetch('/api/submission/runs/'+current)).json();render(j);if(['running','queued'].includes(j.status)){setTimeout(poll,1500)}}catch(e){status.textContent=e.message;setTimeout(poll,2000)}}
-evalBtn.onclick=async()=>{evalBtn.disabled=true;result.hidden=false;status.textContent='업로드하고 3건을 실행하는 중…';try{const j=await send('evaluate');current=j.run_id;render(j);poll();}catch(e){status.textContent=e.message;evalBtn.disabled=false;}};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const I = n => `<span class="ms" aria-hidden="true">${n}</span>`;
+const zip = $("#zip"), drop = $("#drop"), file = $("#file"), validateBtn = $("#validate"), evalBtn = $("#evaluate"), validation = $("#validation");
+const result = $("#result"), status = $("#status"), cases = $("#cases"), note = $("#note"), log = $("#log");
+let selected = null, current = "";
+const mb = n => `${((n || 0) / 1024 / 1024).toFixed(2)}MB`;
+function pick(f){
+  selected = f || null;
+  file.innerHTML = selected ? `${I("folder_zip")}<span>${esc(selected.name)}</span><span class="meta">${mb(selected.size)}</span>` : "고른 파일 없음";
+  file.classList.toggle("meta", !selected);
+  validateBtn.disabled = !selected; evalBtn.disabled = true; validation.innerHTML = "";
+}
+zip.onchange = () => pick(zip.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); pick(e.dataTransfer.files[0]); };
+function showValidation(v){
+  const ok = !!v.valid; evalBtn.disabled = !ok;
+  validation.innerHTML = `<p class="status" style="margin-top:12px"><span class="chip sm ${ok ? "g" : "r"}">${ok ? "제출 가능" : "제출 거부"}</span>${v.file_count}개 파일 · 풀면 ${mb(v.uncompressed_bytes)}</p>` +
+    (v.errors?.length ? `<div class="note bad">${esc(v.errors.join("\n"))}</div>` : "") +
+    (v.warnings?.length ? `<div class="note">${I("info")}<span>${v.warnings.map(esc).join("<br>")}</span></div>` : "");
+}
+// HTTP 헤더는 ASCII 만 되므로 한글 파일 이름은 encodeURIComponent 로 보낸다 (서버가 풀어서 ZIP 이름 = 실험 라벨)
+async function send(path){
+  const r = await fetch("/api/submission/" + path, {method:"POST", headers:{"Content-Type":"application/zip", "X-Filename":encodeURIComponent(selected.name)}, body:selected});
+  const j = await r.json(); if (!r.ok && !j.validation) throw Error(j.error || "업로드 실패"); return j;
+}
+validateBtn.onclick = async () => { validateBtn.disabled = true; try { showValidation((await send("validate")).validation); } catch(e){ validation.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; } finally { validateBtn.disabled = false; } };
+const STATUS = {completed:["g","완료"], passed:["g","통과"], running:["", "실행 중"], queued:["", "대기"], failed:["r","실패"], timeout:["r","시간 초과"], completed_with_errors:["y","일부 실패"], error:["r","오류"], invalid:["r","제출 거부"]};
+const chip = s => { const [c, t] = STATUS[s] || ["", s || "확인 중"]; return `<span class="chip sm ${c}">${esc(t)}</span>`; };
+const scoreCls = t => t >= 70 ? "g" : t >= 40 ? "y" : "r";
+function caseHTML(c){
+  const scored = typeof c.score === "number";
+  const link = c.encounter_name ? `<a href="index.html#c/${encodeURIComponent(c.encounter_name)}/result">CPX 화면에서 대화·피드백 보기</a>` : "";
+  const sub = c.turns == null ? "" : `${c.turns}턴${c.doctor_calls != null ? ` · Doctor ${c.doctor_calls}회` : ""}${c.seconds != null ? ` · ${c.seconds}초` : ""}`;
+  return `<div class="case"><div class="case-h"><b>${esc(c.case_id)}</b>${chip(c.status)}</div>
+    <div class="score ${scored ? scoreCls(c.score) : "n"}">${scored ? `${c.score}<small>/ 100</small>` : c.status === "running" ? "실행 중" : "채점 전"}</div>
+    ${sub ? `<span class="meta">${esc(sub)}${c.diagnosis ? ` · 주진단 ${esc(c.diagnosis)}` : ""}</span>` : ""}
+    ${c.error ? `<span class="meta" style="color:var(--bad)">${esc(c.error)}</span>` : ""}${link ? `<span class="meta">${link}</span>` : ""}</div>`;
+}
+function render(j){
+  result.hidden = false;
+  const z = j.zip || {};
+  status.innerHTML = `${chip(j.status)}<span>실행 ID ${esc(j.run_id || current)}</span>${z.name ? `<span>· ${esc(z.name)} (${mb(z.bytes)}, sha256 ${esc(String(z.sha256 || "").slice(0, 12))})</span>` : ""}${j.average_score != null ? `<span>· 평균 <b>${j.average_score}</b>점</span>` : ""}`;
+  cases.innerHTML = (j.cases || []).map(caseHTML).join("");
+  const errs = j.local_scoring?.errors || [];
+  note.innerHTML = (j.score_note ? `<div class="note">${I("info")}<span>${esc(j.score_note)}</span></div>` : "") +
+    (errs.length ? `<div class="note bad">채점하지 못한 증례가 있습니다. CPX 화면의 결과 탭에서 '다시 채점'을 누르세요.\n${esc(errs.join("\n"))}</div>` : "");
+  if (j.error) { log.hidden = false; log.textContent = j.error; }
+  else if (j.cases?.some(c => c.output_tail)) { log.hidden = false; log.textContent = j.cases.map(c => `--- ${c.case_id} ---\n${c.output_tail || ""}`).join("\n"); }
+}
+async function poll(){
+  try { const j = await (await fetch("/api/submission/runs/" + current)).json(); render(j); if (["running","queued"].includes(j.status)) setTimeout(poll, 1500); else evalBtn.disabled = false; }
+  catch(e){ status.textContent = e.message; setTimeout(poll, 2000); }
+}
+evalBtn.onclick = async () => {
+  evalBtn.disabled = true; result.hidden = false; status.textContent = "업로드하고 3건을 실행하는 중…";
+  try { const j = await send("evaluate"); current = j.run_id; render(j); poll(); } catch(e){ status.textContent = e.message; evalBtn.disabled = false; }
+};
 </script>
 </body>
 </html>

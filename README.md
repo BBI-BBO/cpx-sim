@@ -63,8 +63,11 @@ S·O·A·P 초진 기록을 제출하면 CPX 방식으로 채점하는 연습 �
 - 다른 사람이 만든 진료는 창이나 탭으로 돌아올 때, 그리고 화면을 보는 동안 1분마다 사이드바와 지금 연 진료에 저절로 들어옵니다.
 - 새 판이 배포되면 위쪽에 **새로고침** 단추가 뜹니다. 누르면 고친 화면으로 바뀝니다.
 
-환자에 대해 알아 둘 것
-- 환자는 물은 것만 답합니다. 없는 증상은 짧게 부인하고, 묻지 않은 증상은 먼저 말하지 않습니다.
+환자에 대해 알아 둘 것 (NOVA 개발 키트 `nova_local.py`와 같은 규칙)
+- 환자는 **시작 정보와 환자 대본만** 압니다. 물은 것 하나에 20자 안팎으로 답하고, 묻지 않은 증상·병력·걱정은 먼저 말하지 않습니다.
+- 한 번에 여러 개를 물으면 첫 질문에만 답합니다. "다 말해 주세요"처럼 나열·요약을 부탁하거나 진찰 전체를 해 달라고 하면 "한 번에 하나씩 물어봐 주세요."라고만 답합니다.
+- "어떻게 오셨어요?", "다른 증상은요?" 같은 열린 질문에는 주된 증상 하나로 답합니다. 진단을 물으면 "그걸 알고 싶어서 왔어요"처럼 답합니다.
+- 대본에 없어도 환자가 당연히 알 만한 것은 '그런 문제가 없는 사람'처럼 답하고, 정확한 수치·의학 용어처럼 환자가 알 수 없는 것만 모른다고 합니다.
 - 환자는 자기 몸을 다 알지 못합니다. 다른 병원에서 들은 진단이나 "임신은 아닐 거예요" 같은 짐작은 단서일 뿐입니다.
   그 말만 믿고 위험한 진단을 지우면 감점이고, 가능성이 낮아도 감별에 남겨 검사·기록으로 확인하는 계획을 세우면 가점입니다.
 
@@ -112,16 +115,16 @@ POST /api/login   GET /api/cases   POST /api/start   POST /api/act            PO
 요청 {"name": "20261007_152919_A", "act": "EXAM", "text": "배를 눌러 볼게요"}
 요청 {"name": "20261007_152919_A", "act": "TEST", "text": "CBC 볼게요"}       // 본선만
 응답 {"ok": true,  "out": "엿새 전부터 아팠어요.", "turn": 3, "rejected": 0}
-응답 {"ok": true,  "out": "복부 촉진: 복부 전체에 압통이 있다.", "turn": 4, …}
-응답 {"ok": false, "out": "반려: 신체진찰 동작을 인식하지 못했습니다 (1턴 사용)", "turn": 5, "rejected": 1}
+응답 {"ok": true,  "out": "복부 전체 압통(+), 반발통(-)", "turn": 4, …}                 // EXAM 은 진찰표 결과만 (대회와 같음)
+응답 {"ok": false, "code": "EXAM_NOT_SPECIFIC", "out": "반려: 진찰 동작 하나를 구체적으로 요청해 주세요 (…) (1턴 사용)", "turn": 5, "rejected": 1}
 ```
 | act | 뜻 | 규칙 |
 |---|---|---|
 | `SAY` | 질문·설명·공감 | 30자 이하, 한 번에 하나만 묻기. 인사·공감 뒤에 질문 하나는 괜찮음 |
-| `EXAM` | 진찰 동작 하나 | 진찰 목록은 대회 규칙상 일부러 주지 않음. 묶으면 반려. 증례에 기록이 없는 진찰은 "특이 소견 없음" |
+| `EXAM` | 진찰 동작 하나 | 진찰 목록은 대회 규칙상 일부러 주지 않음. 전신·부위 전체·여러 동작 묶음은 `EXAM_NOT_SPECIFIC`, 진찰이 아닌 요청은 `EXAM_NOT_RECOGNIZED` (둘 다 1턴). 진찰표에 없는 실제 진찰은 나이·성별에 맞는 구체적 소견을 한 번 만들고 같은 진찰엔 같은 답 |
 | `TEST` | 검사 하나 | 본선만 |
 
-`ok: false` 는 반려(규칙 위반)나 불가(예선의 TEST, 턴 소진)이며 턴은 줄지 않습니다. `out` 에 이유가 있습니다.
+`ok: false` 는 반려(규칙 위반)나 불가이며 `code` 에 대회와 같은 오류 코드가 옵니다. 빈 내용 `EMPTY_CONTENT`·30자 초과 `CONTENT_TOO_LONG`·`EXAM_NOT_SPECIFIC`·`EXAM_NOT_RECOGNIZED` 는 1턴을 쓰고, 예선의 TEST `ACTION_NOT_AVAILABLE`·턴 소진은 턴을 쓰지 않습니다. 환자·진찰 판정 모델이 답을 못 하면 503(턴 안 씀)이니 다시 보내면 됩니다.
 
 **⑤ SOAP 제출** `POST /api/submit` — 진료가 끝나고 채점합니다. 1~2분 걸리니 요청 시간 제한을 넉넉히 (예: `curl --max-time 180`).
 ```json
@@ -200,7 +203,7 @@ Claude·GPT 의사로 "이렇게 바꾸면 점수가 오를까?"를 시험할 �
 순서
 1. **대조군** — 아무것도 바꾸지 않고 `H0 기본` 라벨로 돌립니다. 환자 응답과 채점에 무작위성이 있어 한 번으로는 차이를 말하기 어려우니 같은 환자를 `--repeat 3` 이상.
 2. **가설 하나만 바꾸기** — `H1 …` 라벨로 같은 환자·같은 모델·같은 횟수. 한 번에 한 가지만 바꿔야 무엇이 효과인지 압니다.
-3. **비교** — 웹 사이드바의 **실험 라벨** 단추를 누르면 라벨별 횟수·평균 점수가 나옵니다. 라벨을 고르면 그 진료만 보이고, 결과 탭 맨 위에 라벨·메모가 나옵니다.
+3. **비교** — 웹 사이드바는 진료를 라벨별로 묶어 보여 줍니다 (묶음마다 횟수·평균 점수·주진단 정확도, 라벨 없는 진료는 맨 아래, 접고 편 상태는 브라우저에 기억). **실험 라벨** 단추를 누르면 라벨별 횟수·평균 점수가 나옵니다. 라벨을 고르면 그 진료만 보이고, 결과 탭 맨 위에 라벨·메모가 나옵니다.
 4. **기록** — 진료 화면 오른쪽 위 ⋮ 메뉴 → **제목·라벨·메모**에서 결과·관찰을 적습니다. 이미 쓴 라벨은 목록에서 고를 수 있습니다.
 
 ```bash
@@ -228,5 +231,37 @@ API로 직접 붙일 때는 `/api/start` 에 `label`·`title`·`memo` 를 같이
 | `SP_OPENAI_API_KEY` | 서버가 쓰는 OpenAI API 키 |
 | `SP_WEB_PASSWORD` | 팀 공용 접속 비밀번호 |
 
-프롬프트·규칙은 연구 폴더의 `tools/sp_sim.py`·`tools/sp_build_cases.py`, 화면은 `tools/sp_web.html` 이 원본입니다.
-고친 뒤 `tools/export_cpx_sim.py` 를 돌리면 `prompts.ts` 와 `web/index.html` 이 그대로 따라옵니다.
+프롬프트·규칙(`supabase/functions/api/prompts.ts`)과 화면(`web/index.html`, 공통 스타일 `web/ui.css`)은 **이 저장소가 원본**입니다. 예전 연구 폴더의 `tools/export_cpx_sim.py` 는 더 이상 쓰지 않습니다.
+가상 환자·진찰 판정 문구(`PATIENT_RULES`·`EXAMINER_RULES`·`EXAM_RESULT_RULES`)는 NOVA 개발 키트 `nova_local.py` 와 같게 유지합니다.
+
+### 증례 형식
+
+증례는 공개 샘플 `case.json` 과 같은 대회 형식으로 저장합니다.
+
+```json
+{"start_information": {"opening": "첫마디", "vital_signs": "활력징후"},
+ "patient_script": "환자가 아는 전부 (글 한 덩어리)",
+ "exam_results": [{"exam": "복부 촉진 (Abdominal palpation)", "result": "우하복부 압통(+)"}],
+ "model_record": {"S": {…}, "O": {…}, "A": {…}, "P": {…}, "diagnosis": "…"},   // 선택
+ "truth": "정답", "patient": {"name", "age", "sex", "chief_complaint"}, "reference": …, "checklist": …}
+```
+
+선택 칸 `patient_profile`(AgentClinic `Patient_Actor` 구조: `demographics`·`primary_symptom`·`secondary_symptoms`·`past_medical_history`·`social_history`·`review_of_systems`)이 있으면
+가상 환자에게 줄 때만 대본 뒤에 "추가 정보"로 붙입니다 (환자 규칙 문구는 개발 키트 그대로).
+
+AgentClinic-MedQA 를 영어 참고용 연습 증례로 바꾸려면 (서버에는 넣지 않음, `reference_only: true` 표시):
+
+```bash
+python3 scripts/import_agentclinic.py --input <AgentClinic-MedQA>/agentclinic_medqa_extended.jsonl --output /tmp/agentclinic-cases --limit 10
+```
+
+채점: 주진단은 5점 척도(5 정확·4 매우 근접·3 밀접 관련·2 관련·1 무관, Nori et al. 2025)로 매겨 진단추론의 주진단 6점으로 환산하고,
+기록은 ACI-Bench 방식으로 사실마다 근거·지어냄·누락을 나눠 정보수집(기록)·안전(지어낸 기록 감점)에 씁니다. 자세한 기준은 `docs/NOVA_RULES_SOAP.md` 14.1.
+
+예전 형식(A~G: `script`·`qa`·`beliefs`·`exam`·`vitals`)은 엔진이 그 글을 이어 붙여 읽습니다. 저장된 증례를 바꾸려면
+`scripts/convert_cases.py` (파일 또는 `--api` 로 DB, 기본은 미리 보기·`--apply` 로 저장). 증례 관리 → **대회 형식** 탭에서도 고칠 수 있습니다.
+
+### ZIP 평가 기록
+
+`nova-evaluate.html` 에서 ZIP 을 실행하면 각 진료 기록에 라벨 = ZIP 이름(확장자 뺀 것), 제목 = `ZIP 이름 · 증례 주호소`,
+메모 = ZIP 이름·크기·sha256 앞 12자리·실행 ID·시각·방식이 붙어 사이드바에서 ZIP 별로 묶입니다.

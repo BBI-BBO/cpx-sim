@@ -9,6 +9,7 @@ use `--dry-run` when only ZIP validation is desired.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
@@ -95,8 +96,42 @@ def _official_score(remote: dict) -> tuple[int | None, dict, dict]:
     return total, scores if isinstance(scores, dict) else {}, judge if isinstance(judge, dict) else {"official": raw}
 
 
+MODE_LABELS = {"official_sample_server": "NOVA 공개 샘플 서버", "local_devkit": "로컬 개발 키트"}
+
+
+def zip_info(path: str | os.PathLike[str], mode: str = "") -> dict:
+    """제출 ZIP 의 이름·크기·sha256. 진료 기록의 실험 라벨·메모에 쓴다."""
+    archive = Path(path)
+    digest = hashlib.sha256()
+    with archive.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {"name": archive.name, "stem": archive.stem, "bytes": archive.stat().st_size, "sha256": digest.hexdigest(),
+            "started_at": time.strftime("%Y-%m-%d %H:%M"), "mode": mode}
+
+
+def encounter_meta(case_id: str, fixture: dict, run_id: str, zip_meta: dict | None, finalized: bool) -> dict:
+    """ZIP 평가: 라벨 = ZIP 이름(확장자 뺀 것), 제목 = 'ZIP 이름 · 증례·주호소', 메모 = ZIP·실행 정보."""
+    state = "실행 완료" if finalized else "실행 중"
+    if not zip_meta:
+        return {"label": "NOVA 공개 샘플", "title": "", "memo": f"{case_id} · NOVA 공개 샘플 서버 {state}"}
+    cc = str((fixture.get("patient") or {}).get("chief_complaint") or "").strip()
+    size = zip_meta.get("bytes") or 0
+    size_txt = f"{size / 1024 / 1024:.2f}MB" if size >= 1024 * 1024 else f"{size / 1024:.1f}KB"
+    memo = "\n".join([
+        f"ZIP: {zip_meta.get('name', '')} ({size_txt}, sha256 {str(zip_meta.get('sha256', ''))[:12]})",
+        f"실행 ID: {run_id}",
+        f"시각: {zip_meta.get('started_at', '')}",
+        f"방식: {MODE_LABELS.get(zip_meta.get('mode', ''), zip_meta.get('mode', '') or '-')}",
+        f"증례: {case_id}{' · ' + cc if cc else ''} · {state}",
+    ])
+    return {"label": str(zip_meta.get("stem") or zip_meta.get("name") or "ZIP")[:60],
+            "title": f"{zip_meta.get('stem', '')} · {case_id}{' ' + cc if cc else ''}"[:100], "memo": memo,
+            "zip": {k: zip_meta.get(k) for k in ("name", "bytes", "sha256", "started_at", "mode")}, "run_id": run_id}
+
+
 def _encounter_from_remote(case_id: str, remote: dict, fixture: dict, run_id: str,
-                           encounter_name: str | None = None, finalized: bool = True) -> dict:
+                           encounter_name: str | None = None, finalized: bool = True, zip_meta: dict | None = None) -> dict:
     initial = remote.get("initial") or {}
     events = []
     turn = 0
@@ -120,21 +155,23 @@ def _encounter_from_remote(case_id: str, remote: dict, fixture: dict, run_id: st
     total, scores, judge = _official_score(remote)
     submit = {"type": "submit", "total": total, "scores": scores, "judge": judge, "patient": {},
               "soap": soap, "soap_split": {k: [soap[k]] if soap[k] else [] for k in "SOAP"},
-              "soap_fields": soap_fields, "dx": remote.get("diagnosis", ""), "turns": turn, "rejected": 0, "truth": fixture.get("truth"),
+              "soap_fields": soap_fields, "dx": remote.get("diagnosis", ""), "turns": turn, "rejected": 0,
+              "truth": fixture.get("truth") or (fixture.get("model_record") or {}).get("diagnosis"),
               "official_result": remote.get("score") or remote.get("session"), "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    p = fixture.get("patient") or {}
+    start_info = fixture.get("start_information") or {}
+    p = {**(fixture.get("patient") or {}), "opening": initial.get("opening") or start_info.get("opening") or (fixture.get("patient") or {}).get("opening", "")}
     name = encounter_name or f"{stamp}_{case_id}_NOVA_{run_id}"
     return {"name": name, "cid": case_id, "mode": "예선",
             "start": {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "patient": p,
-                      "vitals": initial.get("vital_signs", fixture.get("vitals", "")), "max_turns": 50, "maxlen": 30},
+                      "vitals": initial.get("vital_signs") or start_info.get("vital_signs") or fixture.get("vitals", ""), "max_turns": 50, "maxlen": 30},
             "events": events, "draft": None if finalized else {"soap": soap, "soap_fields": soap_fields, "dx": remote.get("diagnosis", "")},
             "submits": [submit] if finalized else [],
-            "meta": {"label": "NOVA 공개 샘플", "title": "",
-                     "memo": f"{case_id} · NOVA 공개 샘플 서버 {'실행 완료' if finalized else '실행 중'}"},
+            "meta": encounter_meta(case_id, fixture, run_id, zip_meta, finalized),
             "usage": {"calls": 0, "in": 0, "out": 0}, "turns": turn, "n_submits": 1 if finalized else 0,
             "cc": p.get("chief_complaint", ""), "who": f"{p.get('age', '')}세 {p.get('sex', '')}".strip(),
-            "total": total if finalized else None, "dx": remote.get("diagnosis", "") if finalized else None, "truth": fixture.get("truth") if finalized else None,
+            "total": total if finalized else None, "dx": remote.get("diagnosis", "") if finalized else None,
+            "truth": (fixture.get("truth") or (fixture.get("model_record") or {}).get("diagnosis")) if finalized else None,
             "accuracy": (judge.get("accuracy") if isinstance(judge, dict) else None), "scores": scores}
 
 
@@ -202,7 +239,7 @@ def _write_progress(path: Path | None, report: dict) -> None:
 def _evaluate_official(submission: str | os.PathLike[str], devkit: str | os.PathLike[str], samples: str | os.PathLike[str],
                        result_root: Path, timeout: int, api_base: str, dev_key: str,
                        publish_api: str = "", publish_password: str = "", progress_path: Path | None = None,
-                       validation: dict | None = None, run_id: str | None = None) -> dict:
+                       validation: dict | None = None, run_id: str | None = None, zip_meta: dict | None = None) -> dict:
     sample_ids = _public_sample_ids(api_base, dev_key)
     devkit_path, samples_path = Path(devkit).resolve(), Path(samples).resolve()
     adapter_cases = json.loads((samples_path.parent / "nova-samples-cases.json").read_text(encoding="utf-8"))
@@ -212,7 +249,7 @@ def _evaluate_official(submission: str | os.PathLike[str], devkit: str | os.Path
         with zipfile.ZipFile(submission) as archive:
             archive.extractall(extract)
         report = {"run_id": run_id or uuid.uuid4().hex[:12], "mode": "official_sample_server", "cases": [], "status": "running", "average_score": None,
-                  "submission": validation or {},
+                  "submission": validation or {}, "zip": zip_meta or {},
                   "score_note": "NOVA 공개 샘플 서버의 참고 결과입니다. 공식 예선 점수와는 다를 수 있습니다.",
                   "criteria": {"domains": {"정보수집": 25, "진단추론": 15, "검사·추적": 10, "안전": 15, "의사소통": 15, "효율": 20},
                                "rules": {"max_turns": 50, "max_chars": 30, "one_action_per_turn": True, "preliminary_test": False}}}
@@ -228,8 +265,10 @@ def _evaluate_official(submission: str | os.PathLike[str], devkit: str | os.Path
             child_env = os.environ.copy()
             child_env["NOVA_PUBLISH_API"] = publish_api
             child_env["NOVA_PUBLISH_PASSWORD"] = publish_password
+            child_env["NOVA_PUBLISH_META"] = json.dumps(zip_meta or {}, ensure_ascii=False)
             report["cases"].append({"case_id": case_id, "status": "running", "seconds": 0, "turns": 0,
-                                    "result_dir": str(out), "published_live": bool(publish_api and publish_password)})
+                                    "result_dir": str(out), "published_live": bool(publish_api and publish_password),
+                                    "encounter_name": encounter_name})
             jobs[case_id] = (cmd, child_env, out, encounter_name)
         _write_progress(progress_path, report)
 
@@ -245,8 +284,8 @@ def _evaluate_official(submission: str | os.PathLike[str], devkit: str | os.Path
                         "result_dir": str(out), "encounter_name": encounter_name,
                         "score": raw.get("score"), "diagnosis": raw.get("diagnosis"),
                         "publish_errors": raw.get("publish_errors", [])}
-                encounter = _encounter_from_remote(case_id, raw, fixture, report["run_id"],
-                                                   encounter_name=encounter_name, finalized=True) if raw.get("status") == "completed" else None
+                encounter = _encounter_from_remote(case_id, raw, fixture, report["run_id"], encounter_name=encounter_name,
+                                                   finalized=True, zip_meta=zip_meta) if raw.get("status") == "completed" else None
                 return case, encounter
             except Exception as exc:
                 return {"case_id": case_id, "status": "failed", "seconds": round(time.monotonic() - started, 2), "error": str(exc)}, None
@@ -278,7 +317,6 @@ def _evaluate_official(submission: str | os.PathLike[str], devkit: str | os.Path
                         case["score"] = scored["total"]
                         case["scores"] = scored["scores"]
                         case["score_source"] = scored["source"]
-                    case.pop("encounter_name", None)
                 report["score_note"] = "NOVA 공개 샘플 서버는 실행만 검증하고 채점하지 않습니다. 표시 점수는 같은 대화·SOAP를 우리 CPX 채점기로 재채점한 참고 점수입니다."
             except Exception as exc:
                 report["local_scoring"] = {"source": "team_cpx_judge", "scored": 0,
@@ -307,10 +345,13 @@ def _summary(output: str, case_id: str, elapsed: float, returncode: int, timed_o
 
 
 def evaluate(submission: str | os.PathLike[str], devkit: str | os.PathLike[str], samples: str | os.PathLike[str], out: str | os.PathLike[str] | None = None, timeout: int = 1800, dry_run: bool = False,
-             official_api: str = "", dev_key: str = "", publish_api: str = "", publish_password: str = "") -> dict:
+             official_api: str = "", dev_key: str = "", publish_api: str = "", publish_password: str = "", run_id: str | None = None) -> dict:
     validation = validate(submission)
+    mode = "official_sample_server" if official_api and dev_key else "local_devkit"
+    zip_meta = zip_info(submission, mode) if Path(submission).is_file() else {}
     report: dict = {
-        "run_id": uuid.uuid4().hex[:12],
+        "run_id": run_id or uuid.uuid4().hex[:12],
+        "zip": zip_meta,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "submission": validation,
         "criteria": {
@@ -349,9 +390,11 @@ def evaluate(submission: str | os.PathLike[str], devkit: str | os.PathLike[str],
 
     if official_api and dev_key:
         report = _evaluate_official(submission, devkit, samples, result_root, timeout, official_api, dev_key, publish_api, publish_password,
-                                    progress_path=result_root / "evaluation.json", validation=validation, run_id=report["run_id"])
+                                    progress_path=result_root / "evaluation.json", validation=validation, run_id=report["run_id"],
+                                    zip_meta=zip_meta)
         report["run_id"] = report.get("run_id") or uuid.uuid4().hex[:12]
         report["submission"] = validation
+        report["zip"] = zip_meta
         return report
 
     with tempfile.TemporaryDirectory(prefix="nova-submission-") as temp:

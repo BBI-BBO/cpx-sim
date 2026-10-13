@@ -1,5 +1,6 @@
-// CPX 가상 환자 API — Supabase Edge Function (Deno). 로컬 판 tools/sp_web.py · tools/sp_sim.py 를 옮긴 것.
-// 경로·응답 모양은 로컬 판과 같아서 화면(web/index.html)은 두 판에서 그대로 쓴다.
+// CPX 가상 환자 API — Supabase Edge Function (Deno). 이 저장소가 원본이다 (예전 로컬 판 tools/sp_web.py · sp_sim.py 에서 옮겨 왔음).
+// 가상 환자(SAY)·진찰 판정(EXAM)과 턴·반려 규칙은 NOVA 2026 개발 키트 nova_local.py 와 같게 맞춘다.
+// 증례는 대회 형식 {start_information, patient_script, exam_results} (+ model_record·truth) 을 읽고, 예전 형식은 caseFacts() 가 바꿔 읽는다.
 // 함수 비밀값: SP_OPENAI_API_KEY, SP_WEB_PASSWORD (GitHub Secrets → 배포 워크플로가 넣음)
 // 자동으로 주어지는 값: SUPABASE_URL·서비스 키 (REST), SUPABASE_DB_URL (SP_DB_DIRECT=1 일 때만). 표마다 RLS 를 켜 두어 공개 키로는 못 읽음
 import * as P from "./prompts.ts";
@@ -17,9 +18,10 @@ const MAX_MIN = Number(env("SP_MAX_MIN") || 30);      // NOVA 공개 샘플 진�
 const AUTH_DAYS = Number(env("SP_AUTH_DAYS") || 1);   // 한 번 들어오면 유지되는 날 수
 const MODELS: Record<string, string> = {
   router: env("SP_ROUTER_MODEL") || "gpt-6-luna", patient: env("SP_PATIENT_MODEL") || "gpt-6-luna",
+  examiner: env("SP_EXAMINER_MODEL") || env("SP_PATIENT_MODEL") || "gpt-6-luna",
   judge: env("SP_JUDGE_MODEL") || "gpt-6-luna", build: env("SP_BUILD_MODEL") || "gpt-6-luna",
 };
-const EFFORT: Record<string, string> = { router: "none", patient: "none", judge: "medium", build: env("SP_BUILD_EFFORT") || "high" };
+const EFFORT: Record<string, string> = { router: "none", patient: "none", examiner: "none", judge: "medium", build: env("SP_BUILD_EFFORT") || "high" };
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
@@ -47,8 +49,6 @@ function safe(name: unknown): string {
 // 파이썬 str.format 과 같은 자리 채우기 ({key}, {{ }})
 const fmt = (t: string, v: Record<string, unknown>) =>
   t.replace(/\{\{|\}\}|\{(\w+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : String(v[k] ?? "None")));
-const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const GREET = new RegExp(P.GREET);
 
 // ───────────── DB: REST(PostgREST) 가 기본. SP_DB_DIRECT=1 이면 직접 연결(postgres.js) ─────────────
 // 실측(10/07): 이 환경에서는 요청마다 직접 연결을 새로 맺어 호출당 약 1초 → REST(0.3~0.5초)가 더 빠름
@@ -212,19 +212,36 @@ const casesPayload = (rows: any[]) => ({
 
 // ───────────── OpenAI ─────────────
 type Usage = { calls: number; in: number; out: number };
-async function chat(role: string, messages: any[], json = false, maxTokens = 2000, U?: Usage): Promise<string> {
+// effort: 역할 기본값 대신 쓸 추론 강도, timeoutMs: 한 번 부르는 데 기다릴 최대 시간 (넘으면 빈 답)
+type ChatOpt = { effort?: string; timeoutMs?: number; signal?: AbortSignal };
+type ChatOut = { text: string; finish: string };
+async function chatFull(role: string, messages: any[], json = false, maxTokens = 2000, U?: Usage, opt: ChatOpt = {}): Promise<ChatOut> {
   if (!OPENAI_KEY) throw bad("서버에 SP_OPENAI_API_KEY 가 없습니다", 500);
   const body: any = { model: MODELS[role] || MODELS.patient, messages, max_completion_tokens: maxTokens };
-  if (EFFORT[role]) body.reasoning_effort = EFFORT[role];
+  const effort = opt.effort ?? EFFORT[role];
+  if (effort) body.reasoning_effort = effort;
   if (json) body.response_format = { type: "json_object" };
+  const until = opt.timeoutMs ? Date.now() + opt.timeoutMs : 0;
   for (let a = 0; a < 3; a++) {
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST", headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
+    const left = until ? until - Date.now() : 0;
+    if (until && left < 1000) return { text: "", finish: "timeout" };
+    let r: Response;
+    try {
+      r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST", headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+        ...(until || opt.signal ? { signal: AbortSignal.any([...(until ? [AbortSignal.timeout(left)] : []), ...(opt.signal ? [opt.signal] : [])]) } : {}),
+      });
+    } catch (e) {
+      if (opt.signal?.aborted) return { text: "", finish: "aborted" };
+      if (until && Date.now() >= until - 1000) return { text: "", finish: "timeout" };
+      if (a === 2) throw bad("OpenAI 연결 오류: " + String((e as Error)?.message || e).slice(0, 200), 502);
+      await sleep(1500 * (a + 1)); continue;
+    }
     const j: any = await r.json().catch(() => ({}));
     if (r.ok) {
       if (U) { U.calls++; U.in += j.usage?.prompt_tokens || 0; U.out += j.usage?.completion_tokens || 0; }
-      return String(j.choices?.[0]?.message?.content || "").trim();
+      const c = j.choices?.[0];
+      return { text: String(c?.message?.content || "").trim(), finish: String(c?.finish_reason || "") };
     }
     const msg = JSON.stringify(j.error || j);
     if (/insufficient_quota|no credits/i.test(msg)) throw bad("OpenAI 계정에 크레딧이 없습니다", 502);
@@ -233,19 +250,92 @@ async function chat(role: string, messages: any[], json = false, maxTokens = 200
     if (a === 2) throw bad("OpenAI 오류: " + msg.slice(0, 200), 502);
     await sleep(1500 * (a + 1));
   }
-  return "";
+  return { text: "", finish: "error" };
+}
+async function chat(role: string, messages: any[], json = false, maxTokens = 2000, U?: Usage): Promise<string> {
+  return (await chatFull(role, messages, json, maxTokens, U)).text;
+}
+function parseJsonObj(t: string): any {
+  const m = t.match(/\{[\s\S]*\}/);
+  try { const v = JSON.parse(m ? m[0] : t); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; }
 }
 async function cjson(role: string, messages: any[], maxTokens = 2000, U?: Usage): Promise<any> {
-  const t = await chat(role, messages, true, maxTokens, U);
-  const m = t.match(/\{[\s\S]*\}/);
-  try { return JSON.parse(m ? m[0] : t); } catch { return {}; }
+  return parseJsonObj(await chat(role, messages, true, maxTokens, U));
+}
+// 채점처럼 출력이 긴 JSON 호출. 추론에 토큰을 다 써서 빈 답(finish=length)이 오거나 JSON 이 깨지거나 늦어지면
+// 추론 강도를 낮춘 예비 호출(low)을 부른다: 본 호출이 일찍 실패하면 바로, hedgeMs 가 지나도 안 끝나면 나란히.
+// 먼저 제대로 온 답을 쓰고 나머지는 끊는다. 둘 다 실패하거나 deadline 이 지나면 {} (호출한 쪽이 '채점 실패'로 남긴다)
+async function cjsonRetry(role: string, messages: any[], maxTokens: number, U: Usage, deadline: number, ok: (j: any) => boolean, hedgeMs = 0): Promise<any> {
+  const stop = new AbortController();
+  const call = async (effort: string): Promise<any> => {
+    const left = deadline - Date.now();
+    if (left < 5e3) return null;
+    try {
+      const out = await chatFull(role, messages, true, maxTokens, U, { effort, timeoutMs: left, signal: stop.signal });
+      const j = parseJsonObj(out.text);
+      if (ok(j)) return j;
+      if (!stop.signal.aborted) console.error(`${role} 빈 답/깨진 JSON (finish=${out.finish}, effort=${effort}, ${out.text.length}자)`);
+    } catch (e) { if (!stop.signal.aborted) console.error(`${role} 호출 실패 (effort=${effort}):`, e); }
+    return null;
+  };
+  const main = call(EFFORT[role] || "medium");
+  let backup: Promise<any> | null = null;
+  const startBackup = () => (backup ??= deadline - Date.now() > 25e3 ? call("low") : Promise.resolve(null));
+  let res: any = null;
+  if (!hedgeMs) {
+    res = (await main) ?? (await startBackup());
+  } else {
+    const early = await Promise.race([main, sleep(hedgeMs).then(() => undefined)]);
+    if (early) res = early;
+    else if (early === null) res = await startBackup();
+    else {
+      const b = startBackup();
+      res = await new Promise<any>((done) => {  // 먼저 성공한 쪽, 둘 다 실패면 null
+        let n = 2;
+        for (const pr of [main, b]) pr.then((v) => { if (v) done(v); else if (--n === 0) done(null); });
+      });
+    }
+  }
+  stop.abort();
+  return res || {};
 }
 
 // ───────────── 채점 도구 (sp_sim.py 와 같음) ─────────────
 const num = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
+// 주진단 5점 척도(dx_score)를 기준으로 dx_level·accuracy 를 맞춘다. 예전 채점(dx_score 없음)은 dx_level 에서 점수를 거꾸로 채운다.
 function normAccuracy(j: any) {
-  const lv = String(j?.dx_level ?? "").trim(), band = P.DX_BAND[lv];
-  if (band && typeof j.accuracy === "number") j.accuracy = Math.min(Math.max(j.accuracy, band[0]), band[1]);
+  if (!j || typeof j !== "object") return j;
+  let ds = Math.round(num(j.dx_score));
+  if (!P.DX_SCALE[ds]) {
+    const lv = String(j.dx_level ?? "").trim();
+    ds = Number(Object.keys(P.DX_SCALE).find((k) => P.DX_SCALE[+k][0] === lv) ?? 0);
+  }
+  if (P.DX_SCALE[ds]) { j.dx_score = ds; j.dx_level = P.DX_SCALE[ds][0]; }
+  const band = P.DX_BAND[String(j.dx_level ?? "").trim()];
+  if (band) j.accuracy = typeof j.accuracy === "number" ? Math.min(Math.max(j.accuracy, band[0]), band[1]) : Math.round((band[0] + band[1]) / 2);
+  return j;
+}
+// 채점 모델의 분류에서 정해지는 세부 점수는 프로그램이 계산한다 (같은 분류면 같은 점수)
+//  - 진단추론.주진단 = 5점 척도 환산 (5→6, 4→4.5, 3→3, 2→1.5, 1→0)
+//  - 정보수집.기록 = 7 × 핵심 grounded ÷ (핵심 grounded + missed)  (ACI-Bench 식 기록 사실 대조. 묻지 않고 쓴 것은 grounded 가 아님)
+//  - 안전.지어낸 기록 감점 = fabricated 1건당 -1, 최대 -3
+function applyRubric(j: any) {
+  if (!j || typeof j !== "object") return j;
+  normAccuracy(j);
+  const put = (d: string, k: string, v: number) => {  // j.sub 은 쓸 값이 있을 때만 만든다 (빈 채점 = '채점 실패' 판정 유지)
+    if (!j.sub || typeof j.sub !== "object") j.sub = {};
+    j.sub[d] = { ...(j.sub[d] || {}), [k]: Math.round(v * 2) / 2 };
+  };
+  if (P.DX_SCALE[j.dx_score]) put("진단추론", "주진단", P.DX_SCALE[j.dx_score][1]);
+  const rf = j.record_facts;
+  if (rf && typeof rf === "object") {
+    const arr = (x: unknown) => (Array.isArray(x) ? x.filter((y) => y && typeof y === "object") : []);
+    const g = arr(rf.grounded), f = arr(rf.fabricated), m = arr(rf.missed);
+    rf.grounded = g; rf.fabricated = f; rf.missed = m;
+    const gKey = g.some((x: any) => typeof x.key === "boolean") ? g.filter((x: any) => x.key === true).length : g.length;
+    put("정보수집", "기록", gKey + m.length ? (7 * gKey) / (gKey + m.length) : g.length ? 7 : 0);
+    put("안전", "지어낸 기록 감점", -Math.min(3, f.length));
+  }
   return j;
 }
 function scoreDomains(j: any, pf: any): Record<string, number> {
@@ -293,6 +383,78 @@ function bullets(d: Record<string, any>) {
   return out.join("\n");
 }
 
+// ───────────── 증례 형식: 대회 형식 하나로 읽기 ─────────────
+// 대회 형식: {start_information: {opening, vital_signs}, patient_script: "대본 한 덩어리", exam_results: [{exam, result}]}
+//            + 선택 model_record {S, O, A, P, diagnosis} · truth.
+// 예전 형식(PMC 로 만든 A~G: script 칸별 목록·qa·beliefs·exam·vitals)은 그 글을 그대로 이어 붙여 읽는다 (새 사실을 만들지 않음).
+// scripts/convert_cases.py 가 같은 규칙으로 저장된 증례를 대회 형식으로 바꾼다. 둘을 함께 고칠 것.
+type ExamRow = { exam: string; result: string };
+type CaseFacts = { start_information: { opening: string; vital_signs: string }; patient_script: string; profile: string; exam_results: ExamRow[]; unified: boolean };
+const txt = (v: unknown) => (v == null ? "" : String(v)).trim();
+const lineList = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).map(txt).filter(Boolean);
+const NOT_FACT_KEYS = /성격|말투|말버릇|감정|예시/;  // 연기 지시라 대본(환자가 아는 사실)에 넣지 않음
+function legacyScript(C: any): string {
+  const sc = C.script || {};
+  const sample = lineList(sc["공개 샘플 대본"]);
+  if (sample.length) return sample.join("\n\n");  // 예전 NOVA 샘플 변환본: 원문 대본만 (qa 는 모범 기록에서 온 것이라 환자 지식이 아님)
+  const out: string[] = [];
+  const opening = txt(C.patient?.opening);
+  if (opening) out.push(opening);
+  for (const [k, v] of Object.entries(sc)) { const xs = lineList(v); if (xs.length) out.push(`${k}: ${xs.join(" / ")}`); }
+  const qa = (C.qa || []).filter((x: any) => txt(x?.q) && txt(x?.a)).map((x: any) => `- ${txt(x.q)}: ${txt(x.a)}`);
+  if (qa.length) out.push("자주 묻는 것:\n" + qa.join("\n"));
+  const persona = Object.entries(C.persona || {}).filter(([k]) => !NOT_FACT_KEYS.test(k))
+    .map(([k, v]) => [k, lineList(v).join(" / ")]).filter(([, v]) => v).map(([k, v]) => `- ${k}: ${v}`);
+  if (persona.length) out.push("나에 대해:\n" + persona.join("\n"));
+  const acting = C.acting || {}, worry = lineList(acting["걱정"]), expect = lineList(acting["기대"]);
+  if (worry.length) out.push(`걱정: ${worry.join(" / ")}`);
+  if (expect.length) out.push(`바라는 것: ${expect.join(" / ")}`);
+  const beliefs = (C.beliefs || []).filter((x: any) => txt(x?.belief)).map((x: any) => `- (${txt(x.kind) || "짐작"}) ${txt(x.belief)}`);
+  if (beliefs.length) out.push("내 생각·들은 말:\n" + beliefs.join("\n"));
+  return out.join("\n\n");
+}
+function legacyExams(C: any): ExamRow[] {
+  const rows = (C.exam || []).map((x: any) => ({ exam: txt(x?.name ?? x?.exam), result: txt(x?.finding ?? x?.result) })).filter((r: ExamRow) => r.exam && r.result);
+  const vit = txt(C.vitals);  // 예전 엔진은 활력징후를 진찰 한 줄로 따로 붙였다
+  if (vit && !rows.some((r: ExamRow) => /활력|vital/i.test(r.exam))) rows.unshift({ exam: "활력징후 측정 (Vital signs)", result: vit.replace(/\s*\n+\s*/g, ", ") });
+  return rows;
+}
+// 선택 칸 patient_profile (AgentClinic Patient_Actor 와 같은 구조): 있으면 가상 환자에게 줄 때만 대본 뒤에 "추가 정보"로 붙인다
+// (patientReply). 가상 환자 규칙(PATIENT_RULES)과 사실 묶음 {"시작 정보", "대본"} 은 개발 키트 그대로 두고 대본 글만 늘어난다.
+// patient_script 칸 자체에는 섞지 않는다 (편집 화면·변환 스크립트가 다시 저장해도 두 번 붙지 않게).
+const PROFILE_LABEL: Record<string, string> = {
+  demographics: "인적 사항", history: "현병력", symptoms: "증상", primary_symptom: "주된 증상", secondary_symptoms: "동반 증상",
+  past_medical_history: "과거력", medications: "복용 약", current_medications: "복용 약", drug_history: "약물력", allergies: "알레르기", family_history: "가족력", social_history: "사회력",
+  review_of_systems: "계통 문진",
+};
+function profileText(pp: unknown): string {
+  if (!pp || typeof pp !== "object" || Array.isArray(pp)) return txt(pp);
+  const out: string[] = [];
+  const walk = (o: Record<string, unknown>) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) { walk(v as Record<string, unknown>); continue; }
+      const val = lineList(v).join(" / ");
+      if (val) out.push(`- ${PROFILE_LABEL[k.toLowerCase()] || k}: ${val}`);
+    }
+  };
+  walk(pp as Record<string, unknown>);
+  return out.length ? "추가 정보(환자 프로필):\n" + out.join("\n") : "";
+}
+function caseFacts(C: any): CaseFacts {
+  const si = C?.start_information || {};
+  const script = txt(C?.patient_script);
+  const exams: ExamRow[] = Array.isArray(C?.exam_results)
+    ? C.exam_results.map((r: any) => ({ exam: txt(r?.exam), result: txt(r?.result) })).filter((r: ExamRow) => r.exam && r.result) : [];
+  return {
+    start_information: { opening: txt(si.opening) || txt(C?.patient?.opening), vital_signs: txt(si.vital_signs) || txt(C?.vitals) },
+    patient_script: script || legacyScript(C || {}),
+    profile: profileText(C?.patient_profile),
+    exam_results: exams.length ? exams : legacyExams(C || {}),
+    unified: !!script && exams.length > 0,
+  };
+}
+const caseTruth = (C: any) => txt(C?.truth) || txt(C?.model_record?.diagnosis);
+
 // ───────────── 진료 엔진 (sp_sim.py Encounter 와 같음) ─────────────
 // NOVA 규칙상 빈 내용·30자 초과·잘못된 EXAM도 1턴을 사용한다. 반려 이벤트에
 // consumes_turn을 남겨 화면의 반려 표시와 실제 턴 수를 동시에 보존한다.
@@ -308,8 +470,9 @@ function elapsedSec(R: any, now = Date.now() + 9 * 3600e3): number {
   return Math.max(0, Math.round((last - t0 + (gap < 10 * 60e3 ? gap : 0)) / 1000));  // 10분 넘게 쉰 시간은 빼고 셈
 }
 function transcript(C: any, turns: any[]) {
-  return [`[시작] 환자: ${C.patient?.opening} / 활력징후: ${C.vitals ?? "None"}`,
-    ...turns.map((e: any) => `[${e.turn}턴 ${e.act}] 의사: ${e.text}\n        → ${e.out ?? `반려: ${e.why}`}`)].join("\n");
+  const F = caseFacts(C);
+  return [`[시작] 환자: ${F.start_information.opening} / 활력징후: ${F.start_information.vital_signs || "None"}`,
+    ...turns.map((e: any) => `[${e.turn}턴 ${e.act}] 의사: ${e.text}\n        → ${e.out ?? `반려(${e.code || "규칙 위반"}): ${e.why}`}`)].join("\n");
 }
 function checkMsg(R: any): string | null {
   if ((R.submits || []).length) return "진료가 이미 끝났습니다.";
@@ -317,108 +480,214 @@ function checkMsg(R: any): string | null {
   if (turnsOf(R).length >= maxTurns(R)) return `${maxTurns(R)}턴을 모두 썼습니다. /제출 로 마무리하세요.`;
   return null;
 }
-function reject(R: any, act: string, text: string, why: string, consumesTurn = false) {
+// 반려. code 는 개발 키트·대회 서버의 오류 코드 (EMPTY_CONTENT, CONTENT_TOO_LONG, EXAM_NOT_SPECIFIC, EXAM_NOT_RECOGNIZED 는 1턴 사용)
+function reject(R: any, act: string, text: string, why: string, code: string) {
+  const consumesTurn = P.TURN_USING_REFUSALS.includes(code);
   const turn = turnsOf(R).length + (consumesTurn ? 1 : 0);
-  R.events.push({ type: "reject", act, text, why, turn: consumesTurn ? turn : undefined, consumes_turn: consumesTurn, time: kst() });
-  return { ok: false, out: `반려: ${why} (${consumesTurn ? "1턴 사용" : "턴 차감 없음"})` };
+  R.events.push({ type: "reject", act, text, why, code, turn: consumesTurn ? turn : undefined, consumes_turn: consumesTurn, time: kst() });
+  return { ok: false, code, out: `반려: ${why} (${consumesTurn ? "1턴 사용" : "턴 차감 없음"})` };
 }
-// 감정으로 맺는 버릇 줄이기: 최근 대답 셋 중 하나라도 감정으로 끝났으면 이번엔 감정 말을 빼라고 덧붙인다 (sp_sim.emo_hint 와 같음)
-function lastSentence(s: string) {
-  const parts = (s || "").trim().split(/(?<=[.?!…])\s+/).filter((x) => x.trim());
-  return parts.length ? parts[parts.length - 1] : "";
-}
-function emoHint(prevOuts: string[], text: string) {
-  if (new RegExp(P.EMO_ASK).test(text || "")) return "";
-  return prevOuts.slice(-3).some((o) => new RegExp(P.EMO_END).test(lastSentence(o))) ? P.EMO_HINT : "";
-}
-async function patientReply(R: any, C: any, text: string, U: Usage) {
-  const p = C.patient || {};
-  const qa = (C.qa || []).filter((x: any) => x?.q && x?.a).map((x: any) => `- ${x.q}: ${x.a}`).join("\n") || "(없음)";  // 출처·근거는 검수용, 환자에게 안 줌
-  const persona = bullets(C.persona || {}) || bullets(C.acting || {}) || "(없음)";  // 자세한 페르소나, 없으면 예전 '연기' 칸
-  // 환자가 잘못 알거나 모르는 것: 환자에게는 생각만 준다 (실제·확인 방법은 채점용)
-  const beliefs = (C.beliefs || []).filter((x: any) => x?.belief).map((x: any) => `- (${x.kind || "짐작"}) ${x.belief}`).join("\n") || "(없음)";
-  const sys = fmt(P.PATIENT_SYS, { name: p.name, age: p.age, sex: p.sex, cc: p.chief_complaint, persona, script: bullets(C.script || {}), qa, beliefs });
-  const msgs: any[] = [{ role: "system", content: sys }, { role: "user", content: "(진료 시작)" }, { role: "assistant", content: p.opening || "" }];
-  const turns = turnsOf(R).filter((e: any) => e.type === "turn");
-  for (const e of turns.slice(-20)) {
-    if (e.act === "SAY") msgs.push({ role: "user", content: e.text }, { role: "assistant", content: e.out });
-    else msgs.push({ role: "user", content: `(${e.act}: ${e.text})` }, { role: "assistant", content: "네." });
+// 모델 답에서 첫 JSON 객체 (nova_local.first_json 과 같음)
+function firstJson(text: string): any {
+  const t = text || "";
+  for (let i = t.indexOf("{"); i >= 0; i = t.indexOf("{", i + 1)) {
+    for (let j = t.indexOf("}", i); j >= 0; j = t.indexOf("}", j + 1)) {
+      try { const v = JSON.parse(t.slice(i, j + 1)); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* 더 긴 조각으로 */ }
+    }
   }
-  const hint = emoHint(turns.filter((e: any) => e.act === "SAY").map((e: any) => e.out), text);
-  if (hint) msgs.push({ role: "system", content: hint });
-  msgs.push({ role: "user", content: text });
-  const out = await chat("patient", msgs, false, 2000, U);
-  return out.replace(new RegExp(`^\\s*(환자|${escRe(String(p.name))})\\s*[:：]\\s*`), "").trim().replace(/^["“”]+|["“”]+$/g, "");
+  return null;
+}
+const nfc = (s: unknown) => String(s ?? "").normalize("NFC");
+// 가상 환자: 시작 정보 + 대본만 알고, 지금까지의 SAY 대화와 이번 의사 말을 JSON 으로 받는다 (nova_local.Simulator.patient 와 같음)
+async function patientReply(R: any, F: CaseFacts, utterance: string, U: Usage): Promise<{ out: string; effective: string }> {
+  const conversation = turnsOf(R).filter((e: any) => e.type === "turn" && e.act === "SAY")
+    .map((e: any) => ({ doctor: e.effective || e.text, patient: e.out }));
+  const facts = { "시작 정보": F.start_information, "대본": [F.patient_script, F.profile].filter(Boolean).join("\n\n") };
+  const msgs = [{ role: "system", content: P.PATIENT_RULES + "\n\n" + JSON.stringify(facts) },
+    { role: "user", content: JSON.stringify({ "대화": conversation, "의사": utterance }) }];
+  let text = "";
+  for (let a = 0; a < 2; a++) {  // 대회 서버처럼 두 번까지
+    text = await chat("patient", msgs, true, 2048, U);
+    const j = firstJson(text);
+    if (j && typeof j.content === "string" && j.content.trim()) {
+      const eff = nfc(j.effective_content);
+      return { out: nfc(j.content).trim(), effective: eff.trim() && utterance.includes(eff) ? eff : utterance };
+    }
+  }
+  if (text.trim() && !text.trimStart().startsWith("{")) return { out: nfc(text).trim(), effective: utterance };
+  throw bad("가상 환자 응답이 올바르지 않습니다 (PATIENT_RESPONSE_INVALID). 턴은 쓰지 않았으니 다시 보내 주세요.", 503);
+}
+// 진찰 판정: 요청을 진찰표 한 행에 대응. 없으면 too_broad / not_exam / unlisted (nova_local.Simulator.examine 과 같음)
+const bigrams = (s: string) => { const t = s.toLowerCase().replace(/\s+/g, ""); const g = new Set<string>(); for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2)); return g; };
+function closestRow(request: string, rows: Record<string, any>): string {
+  const want = bigrams(request);
+  let best = 0, code = "";
+  for (const [c, row] of Object.entries(rows)) {
+    const g = bigrams(row.exam), inter = [...want].filter((x) => g.has(x)).length, uni = new Set([...want, ...g]).size;
+    const sc = inter / Math.max(1, uni);
+    if (sc > best) { best = sc; code = c; }
+  }
+  return best >= 0.2 ? code : "unlisted";
+}
+const maneuverKey = (s: string) => nfc(s).toLowerCase().replace(/[\s·,./()[\]\-]+/g, "");
+async function examine(R: any, F: CaseFacts, request: string, U: Usage):
+  Promise<{ out: string; row: string | null; exam: string; key?: string } | { code: string; why: string }> {
+  const rows: Record<string, any> = {};
+  F.exam_results.forEach((r, i) => { rows[`r${String(i + 1).padStart(2, "0")}`] = r; });
+  const table = Object.entries(rows).map(([c, r]) => `${c} | ${r.exam}`).join("\n");
+  const msgs = [{ role: "system", content: P.EXAMINER_RULES + "\n\n진찰표 (id | 진찰):\n" + table },
+    { role: "user", content: JSON.stringify({ request }) }];
+  let outcome: string | null = null, maneuver = "";
+  for (let a = 0; a < 2; a++) {
+    const j = firstJson(await chat("examiner", msgs, true, 2048, U)) || {};
+    let id = j.id;
+    if (Array.isArray(id) && id.length === 1) id = id[0];
+    if (typeof id === "string" && rows[id]) { outcome = id; break; }
+    if (id == null && ["too_broad", "unlisted", "not_exam"].includes(j.reason)) { outcome = j.reason; maneuver = String(j.maneuver || ""); break; }
+  }
+  outcome ??= closestRow(request, rows);  // 판정 모델이 형식을 못 지키면 이름이 가장 비슷한 행
+  if (outcome === "not_exam") return { code: "EXAM_NOT_RECOGNIZED", why: "신체진찰 동작으로 인식하지 못했습니다" };
+  if (outcome === "too_broad") return { code: "EXAM_NOT_SPECIFIC", why: "진찰 동작 하나를 구체적으로 요청해 주세요 (전신·부위 전체·여러 동작 묶음은 안 됨)" };
+  if (outcome === "unlisted") return await writeFinding(R, F, request, maneuver || request, U);
+  return { out: rows[outcome].result, row: outcome, exam: rows[outcome].exam };
+}
+// 진찰표에 없는 실제 진찰: 진찰표와 같은 형식의 소견을 한 번 지어내고, 이 진료에서 같은 진찰을 다시 하면 같은 답
+async function writeFinding(R: any, F: CaseFacts, request: string, maneuver: string, U: Usage) {
+  const key = maneuverKey(maneuver);
+  const prev = (R.events || []).find((e: any) => e.type === "turn" && e.act === "EXAM" && e.written_key === key);
+  if (prev) return { out: prev.out, row: null, exam: maneuver, key };
+  const table = F.exam_results.map((r) => `${r.exam} | ${r.result}`).join("\n");
+  const msgs = [{ role: "system", content: P.EXAM_RESULT_RULES + "\n\n시작 정보: " + JSON.stringify(F.start_information) + "\n\n진찰표 (진찰 | 결과):\n" + table },
+    { role: "user", content: JSON.stringify({ request, maneuver }) }];
+  for (let a = 0; a < 2; a++) {
+    const result = nfc((firstJson(await chat("examiner", msgs, true, 2048, U)) || {}).result).trim();
+    if (result && [...result].length <= 200 && !result.includes("\n") && !P.VAGUE_RESULTS.includes(result.replace(/\s+/g, ""))) {
+      return { out: result, row: null, exam: maneuver, key };
+    }
+  }
+  throw bad("진찰 판정 응답이 올바르지 않습니다 (EXAMINER_RESPONSE_INVALID). 턴은 쓰지 않았으니 다시 보내 주세요.", 503);
+}
+// 공통 입력 검사: 빈 내용·30자(NFC) 초과는 1턴 사용
+function inputError(R: any, kind: string, text: string) {
+  if (!text.trim()) return reject(R, kind, text, "내용이 비어 있습니다", "EMPTY_CONTENT");
+  const len = [...text].length;
+  if (len > P.MAXLEN) return reject(R, kind, text, `${len}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`, "CONTENT_TOO_LONG");
+  return null;
 }
 async function say(R: any, C: any, text: string, U: Usage) {
   const m = checkMsg(R);
-  if (m) return { ok: false, out: m };
-  const normalized = text.normalize("NFC");
-  const len = [...normalized].length;
-  if (!normalized.trim()) return reject(R, "SAY", text, "내용을 입력해 주세요", true);
-  if (len > P.MAXLEN) return reject(R, "SAY", text, `${len}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`, true);
-  const core = normalized.replace(GREET, "").trim() || normalized;  // 앞의 인사·맞장구는 세지 않는다
-  const turns = turnsOf(R);
-  const hist = turns.slice(-4).filter((e: any) => e.type === "turn" && e.act === "SAY").map((e: any) => `의사: ${e.text}\n환자: ${e.out}`).join("\n");
-  const r = await cjson("router", [{ role: "system", content: P.SAY_ROUTER }, { role: "user", content: `최근 대화:\n${hist || "(없음)"}\n\n의사의 말: ${core}` }], 2000, U);
-  const out = await patientReply(R, C, normalized, U);
-  R.events.push({ type: "turn", turn: turns.length + 1, act: "SAY", text: normalized, out, time: kst() });
-  return { ok: true, out, tip: r.exam_like ? " (진찰 결과가 필요하면 /진찰 로 요청하세요)" : "" };
+  if (m) return { ok: false, out: m, code: "TURN_LIMIT_REACHED" };
+  const u = nfc(text);
+  const err = inputError(R, "SAY", u);
+  if (err) return err;
+  const { out, effective } = await patientReply(R, caseFacts(C), u, U);
+  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: "SAY", text: u, out, ...(effective !== u ? { effective } : {}), time: kst() });
+  return { ok: true, out };
 }
 async function act(R: any, C: any, kind: string, text: string, U: Usage) {
   const m = checkMsg(R);
-  if (m) return { ok: false, out: m };
-  const normalized = text.normalize("NFC");
-  if (kind === "TEST" && R.mode !== "본선") return { ok: false, out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
-  if (!normalized.trim()) return reject(R, kind, normalized, "내용을 입력해 주세요", true);
-  if ([...normalized].length > P.MAXLEN) return reject(R, kind, normalized, `${[...normalized].length}자입니다. ${P.MAXLEN}자 이하로 줄여 주세요`, true);
-  let pool: any[], what: string, empty: string;
+  if (m) return { ok: false, out: m, code: "TURN_LIMIT_REACHED" };
+  const u = nfc(text);
+  if (kind === "TEST" && R.mode !== "본선") return { ok: false, code: "ACTION_NOT_AVAILABLE", out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
+  const err = inputError(R, kind, u);
+  if (err) return err;
   if (kind === "EXAM") {
-    pool = [...(C.exam || [])];
-    if (C.vitals) pool.push({ id: "V", name: "활력징후 측정 (혈압·맥박·호흡·체온·산소포화도)", finding: C.vitals });
-    what = "진찰"; empty = "특이 소견 없음";
-  } else {
-    pool = [...(C.tests || [])]; what = "검사"; empty = "결과 없음";
+    const r = await examine(R, caseFacts(C), u, U);
+    if ("code" in r) return reject(R, "EXAM", u, r.why, r.code);
+    R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: "EXAM", text: u, id: r.row, exam: r.exam, ...(r.key ? { written_key: r.key } : {}), out: r.out, time: kst() });
+    return { ok: true, out: r.out };
   }
+  // 본선 TEST: 개발 키트에는 없는 행동이라 예전 규칙 그대로 (검사 목록 한 줄, 없으면 턴 차감 없이 반려)
+  const pool = [...(C.tests || [])];
   const items = pool.map((x) => `${x.id}: ${x.name}`).join("\n") || "(없음)";
-  const r = await cjson("router", [{ role: "system", content: fmt(P.ACT_ROUTER, { what, items }) }, { role: "user", content: normalized }], 2000, U);
+  const r = await cjson("router", [{ role: "system", content: fmt(P.ACT_ROUTER, { what: "검사", items }) }, { role: "user", content: u }], 2000, U);
   let n = parseInt(String(r.items ?? 1)); if (isNaN(n)) n = 1;
-  if (n >= 2) return reject(R, kind, normalized, `${what === "진찰" ? "진찰은" : "검사는"} 한 번에 하나만 요청해 주세요 — ${r.why ?? ""}`.replace(/[ —]+$/, ""), kind === "EXAM");
+  if (n >= 2) return reject(R, kind, u, `검사는 한 번에 하나만 요청해 주세요 — ${r.why ?? ""}`.replace(/[ —]+$/, ""), "TEST_NOT_SPECIFIC");
   const hit = pool.find((x) => x.id === r.id);
-  if (!hit && kind === "EXAM") return reject(R, kind, normalized, "신체진찰 동작을 인식하지 못했습니다", true);
-  if (!hit && kind === "TEST") return reject(R, kind, normalized, "대회에서 제공하지 않는 검사입니다");
-  const out = hit ? `${hit.name}: ${hit.finding || hit.result}` : `${r.label || normalized}: ${empty}`;
-  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: kind, text: normalized, id: r.id ?? null, out, time: kst() });
+  if (!hit) return reject(R, kind, u, "대회에서 제공하지 않는 검사입니다", "TEST_NOT_AVAILABLE");
+  const out = `${hit.name}: ${hit.finding || hit.result}`;
+  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: kind, text: u, id: r.id ?? null, out, time: kst() });
   return { ok: true, out };
 }
+// 채점은 네 갈래로 나눠 동시에 부른다 (긴 SOAP·40턴 넘는 진료에서 한 번에 다 내라고 하면 추론만 하다 토큰이 끝나 빈 답이 왔다).
+//  core = 점수·체크리스트·기록 사실·red flag·영역별 이유, fb = SOAP 피드백(soap_top·soap_more·good·unnecessary),
+//  sents = 문장 조각별 평가, turns = 턴별 평가. 점수는 core 만으로 정해지고 나머지는 실패해도 점수는 남는다.
+// 함수 실행 시간 한도(약 150초) 안에 끝나도록 전체 채점에 쓸 시간을 정해 두고, 그 안에서만 다시 부른다.
+const JUDGE_BUDGET_MS = Number(env("SP_JUDGE_BUDGET_SEC") || 130) * 1000;
+const JUDGE_PART: Record<string, string> = {
+  core: "\n\n[이번 호출에서 낼 것] 위 출력 형식에서 soap_sentences·turn_notes·soap_top·soap_more·good·unnecessary 는 빼고 나머지 키(dx_score·dx_level·accuracy·accuracy_note·sub·record_facts·reasons·checklist·red_flags)를 모두 답합니다. " +
+    "SOAP 피드백·문장별·턴별 평가는 다른 채점위원이 따로 합니다.",
+  fb: "\n\n[이번 호출에서 낼 것] 위 루브릭 중 [SOAP 피드백]만 합니다. 점수·체크리스트·문장별·턴별 평가는 다른 채점위원이 따로 합니다.\n" +
+    "출력 형식의 soap_top·soap_more·good·unnecessary 네 키만 JSON으로 답합니다.",
+  sents: "\n\n[이번 호출에서 낼 것] 위 루브릭 중 [문장별 평가]만 합니다. 점수·체크리스트·피드백은 다른 채점위원이 따로 합니다.\n" +
+    "[문장 조각별 번호]의 모든 조각을 빠짐없이 순서대로 판정해 {\"soap_sentences\": [{\"id\": \"S1\", \"verdict\": \"good|warn|bad\", \"tag\": \"...\", \"note\": \"한 줄\"}]} 하나만 JSON으로 답합니다. note 는 짧게 씁니다.",
+  turns: "\n\n[이번 호출에서 낼 것] 위 루브릭 중 [턴별 평가]만 합니다. 점수·체크리스트·피드백은 다른 채점위원이 따로 합니다.\n" +
+    "진료 기록의 모든 의사 턴을 순서대로 판정해 {\"turn_notes\": [{\"turn\": 1, \"verdict\": \"good|warn|bad\", \"note\": \"한 줄\"}]} 하나만 JSON으로 답합니다. note 는 짧게 씁니다.",
+};
+const JUDGE_TOKENS: Record<string, number> = { core: 16000, fb: 10000, sents: 16000, turns: 10000 };
+// 점수를 정하는 core 가 이 시간 안에 안 끝나면 추론 강도 low 예비 호출을 나란히 띄운다 (먼저 온 답을 씀)
+const JUDGE_HEDGE_MS = Number(env("SP_JUDGE_HEDGE_SEC") || 75) * 1000;
+const JUDGE_OK: Record<string, (j: any) => boolean> = {
+  core: (j) => !!j && (typeof j.sub === "object" && !!j.sub || (Array.isArray(j.checklist) && j.checklist.length > 0)),
+  fb: (j) => Array.isArray(j?.soap_top) || Array.isArray(j?.soap_more),
+  sents: (j) => Array.isArray(j?.soap_sentences),
+  turns: (j) => Array.isArray(j?.turn_notes),
+};
 async function submit(R: any, C: any, soap: Record<string, string>, soapFields: Record<string, any>, dx: string, U: Usage, rescore = false) {
+  const t0 = Date.now(), deadline = t0 + JUDGE_BUDGET_MS;
   const subs = R.submits || [], turns = turnsOf(R), rejected = rejectsOf(R);
   const mins = rescore && subs.length ? num(subs[0].minutes) : elapsedSec(R) / 60;
   const overtime = !!MAX_MIN && mins > MAX_MIN;
   const split: Record<string, string[]> = {};
   for (const k of "SOAP") split[k] = splitSentences(soap[k] || "");
   const numbered = [..."SOAP"].flatMap((k) => split[k].map((x, i) => `[${k}${i + 1}] ${x}`)).join("\n") || "(비어 있음)";
-  const user = `[정답(최종 확진)] ${C.truth}\n[모범 답안: 검사 전(SAY+EXAM) 기준 초진 기록]\n${JSON.stringify(C.reference || {}, null, 1)}\n` +
-    `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(C.exam || [])}\n` +
-    `[환자가 잘못 알거나 모르는 것]\n${JSON.stringify(C.beliefs || [])}\n` +
-    `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n` +
-    `[모델 사용량] 호출 ${U.calls}회 · 입력 ${U.in}토큰 · 출력 ${U.out}토큰. 효율 점수에서 불필요한 호출·출력과 행동 턴 비용을 함께 고려하되, 필요한 임상 추론 호출은 불이익을 주지 마세요.\n` +
-    `[진료 기록]\n${transcript(C, turns)}\n\n[제출한 초진 기록 — 공식 필드별 JSON]\n${JSON.stringify(soapFields, null, 1)}\n[문장 조각별 번호]\n${numbered}\n주진단: ${dx}`;
+  const F = caseFacts(C), truth = caseTruth(C), tr = transcript(C, turns);
+  const ref = `[정답(최종 확진)] ${truth}\n[모범 답안: 검사 전(SAY+EXAM) 기준 초진 기록]\n${JSON.stringify(C.reference || C.model_record || {}, null, 1)}\n`;
+  const ck = `[체크리스트]\n${JSON.stringify(C.checklist || [])}\n`;
+  const exam = `[이 증례에서 진찰로 얻을 수 있던 소견]\n${JSON.stringify(F.exam_results)}\n[환자가 잘못 알거나 모르는 것]\n${JSON.stringify(C.beliefs || [])}\n`;
+  const mode = `[진료 방식] 모드 ${R.mode} · 사용 ${turns.length}/${maxTurns(R)}턴 · 반려 ${rejected}회\n`;
+  // 개발 키트·ZIP 에서 들여온 진료는 사용량 기록이 없다 (0회). 그때는 없는 값으로 효율을 깎지 않게 알려 준다
+  const usage = U.calls > 0
+    ? `[모델 사용량] 호출 ${U.calls}회 · 입력 ${U.in}토큰 · 출력 ${U.out}토큰. 효율 점수에서 불필요한 호출·출력과 행동 턴 비용을 함께 고려하되, 필요한 임상 추론 호출은 불이익을 주지 마세요.\n`
+    : `[모델 사용량] 기록 없음 (외부에서 들여온 진료). 효율은 턴 수·반려·질문의 중복과 순서로만 매기고, 사용량을 이유로 깎지 않습니다.\n`;
+  const fields = `[제출한 초진 기록 — 공식 필드별 JSON]\n${JSON.stringify(soapFields, null, 1)}\n`;
+  const user: Record<string, string> = {
+    core: ref + ck + exam + mode + usage + `[진료 기록]\n${tr}\n\n` + fields + `주진단: ${dx}`,
+    fb: ref + ck + exam + `[진료 기록]\n${tr}\n\n` + fields + `주진단: ${dx}`,
+    sents: ref + exam + `[진료 기록]\n${tr}\n\n[문장 조각별 번호]\n${numbered}\n주진단: ${dx}`,
+    turns: ref + ck + exam + mode + `[진료 기록]\n${tr}\n주진단: ${dx}`,
+  };
   const p = C.patient || {}, acting = { ...(C.acting || {}), ...(C.persona || {}) };
-  const prevPatient = rescore && subs.length ? subs.at(-1).patient : null;  // 대화는 그대로이므로 환자 설문은 처음 것을 쓴다
-  const [j, pf] = await Promise.all([
-    cjson("judge", [{ role: "system", content: P.JUDGE_SYS }, { role: "user", content: user }], 12000, U),
-    prevPatient ? Promise.resolve(prevPatient) : cjson("judge", [
+  // 대화는 그대로이므로 환자 설문은 처음 것을 쓴다. 단 ZIP·NOVA 실행에서 들여온 기록처럼 설문이 비어 있으면 새로 받는다
+  const last = rescore && subs.length ? subs.at(-1).patient : null;
+  const prevPatient = last && last.ppi && Object.keys(last.ppi).length ? last : null;
+  // 채점 호출 사용량은 진료(의사) 사용량과 따로 센다 — 섞이면 다시 채점할 때마다 효율 근거가 부풀었다
+  const JU: Usage = { calls: 0, in: 0, out: 0 };
+  const part = (k: string) => cjsonRetry("judge", [{ role: "system", content: P.JUDGE_SYS + JUDGE_PART[k] }, { role: "user", content: user[k] }], JUDGE_TOKENS[k], JU, deadline, JUDGE_OK[k], k === "core" ? JUDGE_HEDGE_MS : 0)
+    .catch((e) => { console.error(`채점(${k}) 실패:`, e); return {}; });
+  const [core, jf, js, jt, pf] = await Promise.all([
+    part("core"), part("fb"), part("sents"), part("turns"),
+    prevPatient ? Promise.resolve(prevPatient) : cjsonRetry("judge", [
       { role: "system", content: fmt(P.PATIENT_FEEDBACK_SYS, { name: p.name, age: p.age, sex: p.sex, worry: (acting["걱정"] || []).join(" / "), expect: (acting["기대"] || []).join(" / ") }) },
-      { role: "user", content: transcript(C, turns) }], 6000, U),
+      { role: "user", content: tr }], 6000, JU, deadline, (j) => !!j?.ppi && typeof j.ppi === "object" && Object.keys(j.ppi).length > 0).catch(() => ({})),
   ]);
-  normAccuracy(j);
+  const j: any = { ...core };
+  for (const k of ["soap_sentences", "turn_notes", "soap_top", "soap_more", "good", "unnecessary"]) delete j[k];
+  if (JUDGE_OK.fb(jf)) for (const k of ["soap_top", "soap_more", "good", "unnecessary"]) if (Array.isArray(jf[k])) j[k] = jf[k];
+  if (JUDGE_OK.sents(js)) j.soap_sentences = js.soap_sentences;
+  if (JUDGE_OK.turns(jt)) j.turn_notes = jt.turn_notes;
+  applyRubric(j);
   const sev: Record<string, number> = { "⛔": 0, "🔴": 1, "🟡": 2, "⚪": 3 };
   for (const k of ["soap_top", "soap_more"]) if (Array.isArray(j[k])) j[k].sort((a: any, b: any) => (sev[String(a.sev ?? "").trim()] ?? 9) - (sev[String(b.sev ?? "").trim()] ?? 9));
-  const scores = scoreDomains(j, pf);
-  const total = overtime ? 0 : Object.values(scores).reduce((a, b) => a + b, 0);
+  // 채점 모델이 빈 답을 주면 0점이 아니라 '채점 실패'로 남긴다 (평균에 섞이지 않게 total=null, 화면에 다시 채점 단추)
+  const judgeError = !JUDGE_OK.core(core) ? "채점 모델 응답이 비어 있습니다" : "";
+  const scores = judgeError ? {} : scoreDomains(j, pf);
+  const total = judgeError ? null : overtime ? 0 : Object.values(scores).reduce((a, b) => a + b, 0);
+  const parts: Record<string, any> = { fb: jf, sents: js, turns: jt };
+  const judgeMiss = Object.keys(parts).filter((k) => !JUDGE_OK[k](parts[k]));
   R.submits = [...subs, { type: "submit", total, scores, overtime, judge: j, patient: pf, soap, soap_fields: soapFields, soap_split: split, dx, turns: turns.length, rejected,
-    minutes: Math.round(mins * 10) / 10, truth: C.truth, usage: { ...U }, time: kst() }];
+    minutes: Math.round(mins * 10) / 10, truth, usage: { ...U }, judge_usage: JU, judge_sec: Math.round((Date.now() - t0) / 100) / 10, time: kst(),
+    ...(judgeError ? { judge_error: judgeError } : {}), ...(judgeMiss.length ? { judge_missing: judgeMiss } : {}) }];
   R.draft = null;
 }
 
@@ -434,7 +703,9 @@ async function convView(R: any, withRef = true) {
     elapsed_sec: elapsedSec(R), done: subs.length > 0, submit: subs.at(-1) ?? null,
     submits: subs.map((x: any) => ({ time: x.time, total: x.total, dx: x.dx })), draft: subs.length ? null : R.draft ?? null,
   };
-  if (subs.length && withRef) { try { v.reference = (await getCase(R.cid, true)).reference ?? null; } catch { v.reference = null; } }
+  if (subs.length && withRef) {
+    try { const C = await getCase(R.cid, true); v.reference = C.reference ?? null; v.model_record = C.model_record ?? null; } catch { v.reference = null; }
+  }
   return v;
 }
 // 실험 라벨(가설 묶음) · 제목 · 메모(가설·바꾼 것·결과). 요청에 들어 있는 칸만 고친다 (title·memo 만 보내도 라벨은 그대로)
@@ -489,6 +760,8 @@ async function buildCase(cid: string, pmcid: string, truth: string, intro: strin
   const r = await cjson("build", [{ role: "system", content: P.BUILD_SYS }, { role: "user", content: `확진명(truth): ${truth}\n\n원문:\n${articleText(xml)}` }], 20000, U);
   if (!r.patient) throw bad("증례 패키지를 만들지 못했습니다 (모델 응답이 비어 있음)", 502);
   setName(r, cid);
+  const F = caseFacts(r);  // 새 증례도 대회 형식 칸을 같이 둔다
+  Object.assign(r, { start_information: F.start_information, patient_script: F.patient_script, exam_results: F.exam_results });
   const p = r.patient;
   Object.assign(r, { case_id: cid, pmcid, truth, status: "초안 (의학과 검수 전)",
     intro: intro || `${p.age}세 ${p.sex === "여" ? "여성" : "남성"}이 ${p.chief_complaint}(으)로 왔습니다.` });
@@ -498,9 +771,18 @@ async function buildCase(cid: string, pmcid: string, truth: string, intro: strin
 }
 async function caseSave(cid: string, data: any) {
   if (!data || typeof data !== "object" || Array.isArray(data)) throw bad("증례 형식이 잘못되었습니다");
-  const p = data.patient || {};
-  if (!data.truth) throw bad("정답(최종 진단)을 적어 주세요");
-  if (!p.opening || !p.chief_complaint) throw bad("환자 첫마디와 주호소를 적어 주세요");
+  for (const k of Object.keys(data)) if (k.startsWith("_")) delete data[k];  // _unsaved·_derived 같은 화면용 칸
+  const p = (data.patient = data.patient || {}), si = data.start_information;
+  if (si && typeof si === "object") {  // 예전 칸도 같은 값으로 (예전 판 화면·스크립트 호환)
+    if (txt(si.opening)) p.opening = txt(si.opening);
+    if (si.vital_signs != null) data.vitals = txt(si.vital_signs);
+  }
+  if (data.exam_results != null && !Array.isArray(data.exam_results)) throw bad("진찰 결과표(exam_results)는 [{exam, result}] 목록이어야 합니다");
+  if (data.patient_script != null && typeof data.patient_script !== "string") throw bad("환자 대본(patient_script)은 글 한 덩어리여야 합니다");
+  if (data.patient_profile != null && (typeof data.patient_profile !== "object" || Array.isArray(data.patient_profile))) throw bad("환자 프로필(patient_profile)은 {항목: 내용} 객체여야 합니다");
+  if (!caseTruth(data)) throw bad("정답(최종 진단)을 적어 주세요");
+  if (!data.truth) data.truth = caseTruth(data);
+  if (!caseFacts(data).start_information.opening || !p.chief_complaint) throw bad("환자 첫마디와 주호소를 적어 주세요");
   const old = await db.caseRow(cid);
   if (old && old.deleted_at) throw bad("지운 증례입니다");
   if (old) await db.caseHistory(cid, old.data);  // 이전 판 보관
@@ -577,11 +859,14 @@ async function handle(req: Request): Promise<Response> {
       return reply({ rows: rows.map((r: any, i: number) => {
         const c = r.data, p = c.patient || {}, d = new Date(new Date(r.updated_at).getTime() + 9 * 3600e3);
         return { no: i + 1, cid: r.cid, who: `${p.age ?? ""}세 ${p.sex ?? ""}`, cc: p.chief_complaint, truth: c.truth, pmcid: c.pmcid, status: c.status || "", level: c.difficulty || "",
-          exam: (c.exam || []).length, tests: (c.tests || []).length, checklist: (c.checklist || []).length,
+          exam: caseFacts(c).exam_results.length, tests: (c.tests || []).length, checklist: (c.checklist || []).length, format: caseFacts(c).unified ? "대회 형식" : "예전 형식",
           updated: `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}` };
       }) });
     }
-    if (path === "/api/admin/case") return reply(await getCase(safe(qp.cid)));
+    if (path === "/api/admin/case") {  // 예전 형식이면 대회 형식으로 읽은 결과를 _derived 로 같이 준다 (편집 화면에서 채워 저장)
+      const C = await getCase(safe(qp.cid)), F = caseFacts(C);
+      return reply(F.unified ? C : { ...C, _derived: { start_information: F.start_information, patient_script: F.patient_script, exam_results: F.exam_results } });
+    }
     throw bad("없는 주소", 404);
   }
   if (req.method !== "POST") throw bad("없는 주소", 404);
@@ -601,8 +886,9 @@ async function handle(req: Request): Promise<Response> {
     const ids = (await liveCases()).map((r: any) => r.cid);
     const cid = ids.includes(b.cid) ? b.cid : ids[(parseInt(b.no) || 1) - 1];
     if (!cid) throw bad("증례가 없습니다", 404);
-    const C = await getCase(cid), p = C.patient || {}, mode = b.mode === "본선" ? "본선" : "예선";
-    const start = { type: "start", case: cid, pmcid: C.pmcid, mode, models: MODELS, patient: p, vitals: C.vitals, max_turns: P.MAX_TURNS, max_min: MAX_MIN, time: kst() };
+    const C = await getCase(cid), F = caseFacts(C), mode = b.mode === "본선" ? "본선" : "예선";
+    const p = { ...(C.patient || {}), opening: F.start_information.opening };  // 의사가 처음 받는 것: 시작 정보(첫마디·활력징후)뿐
+    const start = { type: "start", case: cid, pmcid: C.pmcid, mode, models: MODELS, patient: p, vitals: F.start_information.vital_signs, max_turns: P.MAX_TURNS, max_min: MAX_MIN, time: kst() };
     let name = `${stamp()}_${cid}`;
     for (let i = 2; ; i++) {
       try {
@@ -617,12 +903,12 @@ async function handle(req: Request): Promise<Response> {
     return reply(await convView(await getEnc(name)));
   }
   if (path === "/api/act") {
-    const kind = String(b.act || "SAY").toUpperCase(), text = String(b.text || "").trim();
+    const kind = String(b.act || "SAY").toUpperCase(), text = String(b.text ?? "");  // 대회처럼 공백도 글자 수에 넣는다
     const R = await getEnc(safe(b.name)), C = await getCase(R.cid, true);
     R.usage = R.usage || { calls: 0, in: 0, out: 0 };
     const r: any = kind === "EXAM" || kind === "TEST" ? await act(R, C, kind, text, R.usage) : await say(R, C, text, R.usage);
     await saveEnc(R);
-    return reply({ ...r, act: kind === "EXAM" || kind === "TEST" ? kind : "SAY", turn: turnsOf(R).length, rejected: rejectsOf(R), elapsed_sec: elapsedSec(R) });
+    return reply({ ...r, act: kind === "EXAM" || kind === "TEST" ? kind : "SAY", turn: turnsOf(R).length, turns_remaining: Math.max(0, maxTurns(R) - turnsOf(R).length), rejected: rejectsOf(R), elapsed_sec: elapsedSec(R) });
   }
   if (path === "/api/draft") {
     const R = await getEnc(safe(b.name));
@@ -679,7 +965,8 @@ async function handle(req: Request): Promise<Response> {
   // 로컬 판 자료 옮기기 (scripts/import_local.py)
   if (path === "/api/admin/import") {
     const cases = (b.cases || []).map((c: any) => ({ cid: safe(c.cid), data: c.data, updated_at: new Date().toISOString() }));
-    const encs = (b.encounters || []).map((e: any) => ({ ...e, name: safe(e.name) }));
+    // 실험 라벨·제목·메모(meta)도 같이 저장해 사이드바에서 라벨별로 묶인다 (ZIP 평가는 ZIP 이름이 라벨)
+    const encs = (b.encounters || []).map((e: any) => ({ ...e, name: safe(e.name), meta: e.meta && typeof e.meta === "object" ? { ...e.meta, ...cleanMeta(e.meta) } : {} }));
     for (const c of cases) await db.caseUpsert(c.cid, c.data);
     if (encs.length) await db.encUpsert(encs);
     forgetCases();

@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import threading
+import urllib.parse
 import uuid
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -69,7 +70,9 @@ class SubmissionHandler(SimpleHTTPRequestHandler):
         run_id = uuid.uuid4().hex[:12]
         run_dir = self.config["runs"] / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        archive = run_dir / (self.headers.get("X-Filename", "submission.zip").replace("/", "_") or "submission.zip")
+        # 화면은 한글 파일 이름을 encodeURIComponent 로 보낸다 (HTTP 헤더는 ASCII 만). 이 이름이 진료 기록의 실험 라벨이 된다.
+        raw_name = urllib.parse.unquote(self.headers.get("X-Filename", "") or "submission.zip")
+        archive = run_dir / (os.path.basename(raw_name.replace("\\", "/")).strip() or "submission.zip")
         archive.write_bytes(self.rfile.read(length))
         result = validate(archive)
         if self.path.endswith("/validate"):
@@ -99,6 +102,7 @@ class SubmissionHandler(SimpleHTTPRequestHandler):
                     dev_key=self.config["dev_key"],
                     publish_api=self.config["publish_api"],
                     publish_password=self.config["publish_password"],
+                    run_id=run_id,
                 )
             except Exception as exc:  # keep the browser pollable on setup errors
                 report = {"run_id": run_id, "status": "error", "error": str(exc), "submission": result, "cases": []}

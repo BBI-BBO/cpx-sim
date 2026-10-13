@@ -6,10 +6,13 @@ Usage:
         /Users/haechan/Downloads/nova-samples-2026 \
         --output fixtures/nova-samples-cases.json
 
-The source samples contain a single prose patient script and a model record.  The
-CPX simulator needs a patient object, an answerable script, an exam table and a
-reference record, so this converter keeps the original prose and derives the
-small amount of adapter metadata without inventing clinical findings.
+The CPX simulator now stores cases in the competition format itself:
+``start_information`` / ``patient_script`` / ``exam_results`` (+ ``model_record``,
+``truth``), exactly as in the public sample ``case.json``.  The virtual patient
+only sees the start information and the script, like the NOVA devkit.  The
+adapter adds a ``patient`` header (name/age/sex/chief complaint for lists) and a
+``reference``/``checklist`` for our CPX judge, derived from the model record
+without inventing clinical findings.
 """
 from __future__ import annotations
 
@@ -51,25 +54,13 @@ def make_case(folder: Path) -> tuple[str, dict]:
     patient = parse_patient(case_id, script, record)
     patient["opening"] = start["opening"].strip()
 
-    exam = [
-        {"id": f"E{i:02d}", "name": row["exam"], "finding": row["result"]}
-        for i, row in enumerate(source.get("exam_results", []), 1)
-    ]
+    exam_results = [{"exam": str(row["exam"]).strip(), "result": str(row["result"]).strip()}
+                    for row in source.get("exam_results", [])]
     s = record.get("S", {})
     o = record.get("O", {})
     a = record.get("A", {})
     p = record.get("P", {})
     diagnosis = str(record.get("diagnosis", "")).strip()
-
-    # One answer bucket per major history area gives the simulator enough signal
-    # to answer focused questions while retaining the original public script.
-    qa = [
-        {"q": "주호소와 현병력", "a": str(s.get("hpi", ""))},
-        {"q": "과거력·약물·알레르기", "a": str(s.get("pmh", ""))},
-        {"q": "가족력", "a": str(s.get("fh", ""))},
-        {"q": "사회력", "a": str(s.get("sh", ""))},
-        {"q": "계통 문진", "a": str(s.get("ros", ""))},
-    ]
 
     reference = {
         "S": lines(s.get("cc")) + lines(s.get("hpi")) + lines(s.get("pmh")) + lines(s.get("fh")) + lines(s.get("sh")) + lines(s.get("ros")),
@@ -105,8 +96,8 @@ def make_case(folder: Path) -> tuple[str, dict]:
         {"item": "과거력·복용 약·알레르기", "type": "SAY", "why": "위험 요인과 처치 결정", "weight": 2},
         {"item": "가족력·사회력", "type": "SAY", "why": "위험도와 감별 보강", "weight": 1},
         *[
-            {"item": row["name"], "type": "EXAM", "why": "공개 진찰 결과표의 핵심 항목", "weight": 1}
-            for row in exam
+            {"item": row["exam"], "type": "EXAM", "why": "공개 진찰 결과표의 핵심 항목", "weight": 1}
+            for row in exam_results
         ],
     ]
 
@@ -115,9 +106,10 @@ def make_case(folder: Path) -> tuple[str, dict]:
         "status": "공개 샘플·로컬 검증용",
         "source": "NOVA 2026 public sample (provided by the user)",
         "patient": patient,
-        "vitals": start["vital_signs"].strip(),
-        "script": {"공개 샘플 대본": [script]},
-        "qa": qa,
+        "start_information": {"opening": start["opening"].strip(), "vital_signs": start["vital_signs"].strip()},
+        "patient_script": script,
+        "exam_results": exam_results,
+        "model_record": record,
         "acting": {
             "성격·말투": "표준화 환자처럼 질문한 항목에만 답하고, 진단명은 스스로 단정하지 않습니다.",
             "걱정": ["현재 증상의 원인과 치료 필요성"],
@@ -125,7 +117,6 @@ def make_case(folder: Path) -> tuple[str, dict]:
             "감정": "질환별 공개 대본의 걱정과 기대를 존중하는 자연스러운 환자 반응",
         },
         "beliefs": [],
-        "exam": exam,
         "tests": [],
         "reference": reference,
         "checklist": checklist,
