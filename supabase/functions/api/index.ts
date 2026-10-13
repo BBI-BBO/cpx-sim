@@ -348,13 +348,19 @@ function scoreDomains(j: any, pf: any): Record<string, number> {
   const ck = j.checklist || [];
   const wAll = ck.reduce((a: number, c: any) => a + (num(c.w ?? 1) || 1), 0);
   const wGot = ck.reduce((a: number, c: any) => a + (c.asked && c.tag !== "지어낸 기록" ? num(c.w ?? 1) || 1 : 0), 0);
-  if (ck.length && wAll && wGot / wAll < 0.6) out["효율"] = Math.min(out["효율"], 10);  // 적게 물어 효율을 버는 것 방지
   const ppi = Object.values(pf?.ppi || {}).map((v) => Math.max(0, Math.min(3, num(v))));
   // 의사소통 15 = 환자 설문(PPI) 9 + 교육 항목을 실제 SAY로 말한 비율 6 (대회: 필요한 설명을 실제로 했는가)
   const ppiPart = ppi.length ? (ppi.reduce((a, b) => a + b, 0) / ppi.length) * 3 : 0;
   const edu = Array.isArray(j.edu) ? j.edu.filter((x: any) => x && typeof x === "object") : [];
   const eduPart = edu.length ? (6 * edu.filter((x: any) => x.said === true).length) / edu.length : ppiPart * (6 / 9);
-  out["의사소통"] = ppiPart + eduPart;
+  const legacy = ppiPart + eduPart;
+  const cs = (sub as any)["의사소통"];
+  if (cs && typeof cs === "object") {   // 채점 모델의 CPX 의사소통 항목(대회 정의) 60% + 환자 설문·교육 항목 40%
+    const CM: Record<string, number> = P.COMM_MAX || {};
+    let t = 0;
+    for (const [k, mx] of Object.entries(CM)) t += Math.max(0, Math.min(mx, num(cs[k])));
+    out["의사소통"] = 0.6 * t + 0.4 * legacy;
+  } else out["의사소통"] = legacy;
   const res: Record<string, number> = {};
   for (const [d, mx] of P.DOMAINS as [string, number][]) res[d] = Math.max(0, Math.min(mx, Math.round(out[d] || 0)));
   return res;
