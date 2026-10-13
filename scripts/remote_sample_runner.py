@@ -51,6 +51,13 @@ class TraceClient:
         if self.on_update:
             self.on_update(self)
 
+    def action(self, action, **fields):
+        # 에이전트가 say()/exam() 대신 SDK action() 을 직접 부를 때도 기록한다
+        response = self._client.action(action, **fields)
+        if str(action).upper() in {"SAY", "EXAM", "TEST"}:
+            self._event(str(action).upper(), str(fields.get("content", "")), response)
+        return response
+
     def say(self, content, **kwargs):
         response = self._client.say(content, **kwargs)
         self._event("SAY", str(content), response)
@@ -76,6 +83,17 @@ class TraceClient:
         if self.on_update:
             self.on_update(self)
         return response
+
+
+def session_events(session: dict) -> list[dict]:
+    """공식 세션의 events → 실행기 기록 형식 [{turn, action, content, response}]"""
+    out = []
+    for e in session.get("events") or []:
+        act = e.get("action")
+        if act in {"SAY", "EXAM", "TEST"}:
+            out.append({"turn": e.get("turn"), "action": act, "content": (e.get("payload") or {}).get("content", ""),
+                        "response": e.get("response") or {}})
+    return out
 
 
 class LivePublisher:
@@ -152,6 +170,8 @@ def main() -> int:
         if publisher:
             publisher(trace, finalized=True)
         final_session = client.session()
+        if not any(e.get("action") in {"SAY", "EXAM", "TEST"} for e in trace.events):  # 기록이 비면 서버 세션 이벤트로 채운다
+            trace.events = session_events(final_session)
         result.update({
             "case_id": args.display_case_id,
             "status": "completed",

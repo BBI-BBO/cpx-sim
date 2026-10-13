@@ -1261,6 +1261,7 @@ function renderResult(){
   const mt = v.meta || {}, expNote = mt.label || mt.memo ? `<div class="exp-note"><div class="k">${I("science")}${esc([mt.label, mt.title].filter(Boolean).join(" · ") || "메모")}</div>${mt.memo ? `<div class="m">${esc(mt.memo)}</div>` : ""}</div>` : "";
   let h = `<div class="pane">${expNote}<div class="stats">
       <div class="stat"><div class="k">총점</div><div class="v" style="color:var(--${!hasScore ? "on2" : scoreCls(sub.total) === "g" ? "ok" : scoreCls(sub.total) === "y" ? "warn" : "bad"})">${hasScore ? sub.total : st === "failed" ? "실패" : "채점 전"}${hasScore ? "<small>/ 100</small>" : ""}</div></div>
+      ${hasScore && sub.total_cal != null && sub.cal_version && sub.cal_version !== "none" ? `<div class="stat" title="대회 샘플 검증 점수에 맞춘 영역별 보정 (${esc(sub.cal_version)})"><div class="k">대회 보정</div><div class="v">${sub.total_cal}<small>/ 100</small></div></div>` : ""}
       <div class="stat"><div class="k">사용 턴</div><div class="v">${sub.turns}<small>/ ${v.max_turns}</small></div></div>
       <div class="stat"><div class="k">반려</div><div class="v">${sub.rejected}<small>회</small></div></div></div>
     ${sub.overtime ? `<div class="callout">${I("timer")}<b>시간 초과로 무효(0점) 처리됐습니다</b></div>` : ""}

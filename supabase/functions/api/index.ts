@@ -350,7 +350,11 @@ function scoreDomains(j: any, pf: any): Record<string, number> {
   const wGot = ck.reduce((a: number, c: any) => a + (c.asked && c.tag !== "지어낸 기록" ? num(c.w ?? 1) || 1 : 0), 0);
   if (ck.length && wAll && wGot / wAll < 0.6) out["효율"] = Math.min(out["효율"], 10);  // 적게 물어 효율을 버는 것 방지
   const ppi = Object.values(pf?.ppi || {}).map((v) => Math.max(0, Math.min(3, num(v))));
-  out["의사소통"] = ppi.length ? (ppi.reduce((a, b) => a + b, 0) / ppi.length) * 5 : 0;
+  // 의사소통 15 = 환자 설문(PPI) 9 + 교육 항목을 실제 SAY로 말한 비율 6 (대회: 필요한 설명을 실제로 했는가)
+  const ppiPart = ppi.length ? (ppi.reduce((a, b) => a + b, 0) / ppi.length) * 3 : 0;
+  const edu = Array.isArray(j.edu) ? j.edu.filter((x: any) => x && typeof x === "object") : [];
+  const eduPart = edu.length ? (6 * edu.filter((x: any) => x.said === true).length) / edu.length : ppiPart * (6 / 9);
+  out["의사소통"] = ppiPart + eduPart;
   const res: Record<string, number> = {};
   for (const [d, mx] of P.DOMAINS as [string, number][]) res[d] = Math.max(0, Math.min(mx, Math.round(out[d] || 0)));
   return res;
@@ -615,7 +619,7 @@ async function act(R: any, C: any, kind: string, text: string, U: Usage) {
 // 함수 실행 시간 한도(약 150초) 안에 끝나도록 전체 채점에 쓸 시간을 정해 두고, 그 안에서만 다시 부른다.
 const JUDGE_BUDGET_MS = Number(env("SP_JUDGE_BUDGET_SEC") || 130) * 1000;
 const JUDGE_PART: Record<string, string> = {
-  core: "\n\n[이번 호출에서 낼 것] 위 출력 형식에서 soap_sentences·turn_notes·soap_top·soap_more·good·unnecessary 는 빼고 나머지 키(dx_score·dx_level·accuracy·accuracy_note·sub·record_facts·reasons·checklist·red_flags)를 모두 답합니다. " +
+  core: "\n\n[이번 호출에서 낼 것] 위 출력 형식에서 soap_sentences·turn_notes·soap_top·soap_more·good·unnecessary 는 빼고 나머지 키(dx_score·dx_level·accuracy·accuracy_note·sub·record_facts·reasons·checklist·red_flags·edu)를 모두 답합니다. " +
     "SOAP 피드백·문장별·턴별 평가는 다른 채점위원이 따로 합니다.",
   fb: "\n\n[이번 호출에서 낼 것] 위 루브릭 중 [SOAP 피드백]만 합니다. 점수·체크리스트·문장별·턴별 평가는 다른 채점위원이 따로 합니다.\n" +
     "출력 형식의 soap_top·soap_more·good·unnecessary 네 키만 JSON으로 답합니다.",
@@ -683,9 +687,16 @@ async function submit(R: any, C: any, soap: Record<string, string>, soapFields: 
   const judgeError = !JUDGE_OK.core(core) ? "채점 모델 응답이 비어 있습니다" : "";
   const scores = judgeError ? {} : scoreDomains(j, pf);
   const total = judgeError ? null : overtime ? 0 : Object.values(scores).reduce((a, b) => a + b, 0);
+  // 대회 보정 점수: 대회 샘플 검증 점수와 짝지어 맞춘 영역별 선형 보정 (P.CAL = {영역: [기울기, 절편]})
+  const scoresCal: Record<string, number> = {};
+  if (!judgeError) for (const [d, mx] of P.DOMAINS as [string, number][]) {
+    const [a, b] = (P.CAL || {})[d] || [1, 0];
+    scoresCal[d] = Math.round(Math.max(0, Math.min(mx, a * (scores[d] ?? 0) + b)) * 10) / 10;
+  }
+  const totalCal = judgeError ? null : overtime ? 0 : Math.round(Object.values(scoresCal).reduce((a, b) => a + b, 0) * 10) / 10;
   const parts: Record<string, any> = { fb: jf, sents: js, turns: jt };
   const judgeMiss = Object.keys(parts).filter((k) => !JUDGE_OK[k](parts[k]));
-  R.submits = [...subs, { type: "submit", total, scores, overtime, judge: j, patient: pf, soap, soap_fields: soapFields, soap_split: split, dx, turns: turns.length, rejected,
+  R.submits = [...subs, { type: "submit", total, scores, total_cal: totalCal, scores_cal: scoresCal, cal_version: P.CAL_VERSION, overtime, judge: j, patient: pf, soap, soap_fields: soapFields, soap_split: split, dx, turns: turns.length, rejected,
     minutes: Math.round(mins * 10) / 10, truth, usage: { ...U }, judge_usage: JU, judge_sec: Math.round((Date.now() - t0) / 100) / 10, time: kst(),
     ...(judgeError ? { judge_error: judgeError } : {}), ...(judgeMiss.length ? { judge_missing: judgeMiss } : {}) }];
   R.draft = null;
