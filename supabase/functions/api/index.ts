@@ -338,13 +338,16 @@ function applyRubric(j: any) {
   }
   return j;
 }
-function scoreDomains(j: any, pf: any): Record<string, number> {
+function scoreDomains(j: any, pf: any, usage?: Usage): Record<string, number> {
   const sub = j.sub || {}, out: Record<string, number> = {};
   for (const [d, parts] of Object.entries(P.SUB_MAX as Record<string, Record<string, number>>)) {
     let t = 0;
     for (const [k, mx] of Object.entries(parts)) t += Math.max(P.SUB_MIN[k] ?? 0, Math.min(mx, num((sub[d] || {})[k])));
     out[d] = t;
   }
+  // 효율의 모델 비용 10점: Doctor 호출 수 기준 (대회 샘플 검증 4판으로 확인: 7회→18.9, 55회→14.7, 90회→8.4). 사용량 정보가 없으면 중간값 5.
+  const calls = num(usage?.calls);
+  out["효율"] = (out["효율"] || 0) + (calls > 0 ? Math.max(0, Math.min(10, 10 - (calls - 7) / 8.5)) : 5);
   const ck = j.checklist || [];
   const wAll = ck.reduce((a: number, c: any) => a + (num(c.w ?? 1) || 1), 0);
   const wGot = ck.reduce((a: number, c: any) => a + (c.asked && c.tag !== "지어낸 기록" ? num(c.w ?? 1) || 1 : 0), 0);
@@ -691,7 +694,7 @@ async function submit(R: any, C: any, soap: Record<string, string>, soapFields: 
   for (const k of ["soap_top", "soap_more"]) if (Array.isArray(j[k])) j[k].sort((a: any, b: any) => (sev[String(a.sev ?? "").trim()] ?? 9) - (sev[String(b.sev ?? "").trim()] ?? 9));
   // 채점 모델이 빈 답을 주면 0점이 아니라 '채점 실패'로 남긴다 (평균에 섞이지 않게 total=null, 화면에 다시 채점 단추)
   const judgeError = !JUDGE_OK.core(core) ? "채점 모델 응답이 비어 있습니다" : "";
-  const scores = judgeError ? {} : scoreDomains(j, pf);
+  const scores = judgeError ? {} : scoreDomains(j, pf, U);
   const total = judgeError ? null : overtime ? 0 : Object.values(scores).reduce((a, b) => a + b, 0);
   // 대회 보정 점수: 대회 샘플 검증 점수와 짝지어 맞춘 영역별 선형 보정 (P.CAL = {영역: [기울기, 절편]})
   const scoresCal: Record<string, number> = {};
@@ -942,6 +945,7 @@ async function handle(req: Request): Promise<Response> {
     if (re && !(R.submits || []).length) throw bad("아직 제출하지 않은 진료입니다");
     const C = await getCase(R.cid, true);
     R.usage = R.usage || { calls: 0, in: 0, out: 0 };
+    if (re && b.usage && typeof b.usage === "object") R.usage = { calls: num(b.usage.calls), in: num(b.usage.in), out: num(b.usage.out) };  // 개발 키트 실행의 사용량
     const { soap, soapFields } = soapInput(b);
     await submit(R, C, soap, soapFields, dx, R.usage, re);
     await saveEnc(R);

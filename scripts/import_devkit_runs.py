@@ -45,15 +45,15 @@ def main():
                        "memo": "\n".join(x for x in [a.memo, f"개발 키트 로컬 실행 {run}",
                                                      f"턴 {s.get('turns')} · Doctor 호출 {s.get('doctor_calls')} · 입력 {s.get('doctor_input_tokens')} / 출력 {s.get('doctor_output_tokens')} 토큰 · {s.get('seconds')}초"] if x)}
         c.post("/api/admin/import", {"encounters": [enc]})
-        names.append((enc["name"], case_id, rec.get("diagnosis", "")))
+        names.append((enc["name"], case_id, rec.get("diagnosis", ""), {"calls": s.get("doctor_calls") or 0, "in": s.get("doctor_input_tokens") or 0, "out": s.get("doctor_output_tokens") or 0}))
         print("올림", enc["name"], "·", rec.get("diagnosis", ""))
     if a.no_score:
         return
-    for name, case_id, dx in names:  # 팀 채점기로 채점 (rescore = 저장된 기록 그대로)
+    for name, case_id, dx, usage in names:  # 팀 채점기로 채점 (rescore = 저장된 기록 그대로)
         conv = c.get("/api/conv?name=" + name)
         sub = conv.get("submit") or {}
         r = c.post("/api/record/rescore", {"name": name, "dx": dx or sub.get("dx") or "진단 미정",
-                                           "soap": sub.get("soap"), "soap_fields": sub.get("soap_fields")})
+                                           "soap": sub.get("soap"), "soap_fields": sub.get("soap_fields"), "usage": usage})
         s = r.get("submit") or {}
         print(case_id, "점수", s.get("total"), s.get("scores"), "· 정확도", (s.get("judge") or {}).get("accuracy"))
 

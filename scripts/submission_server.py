@@ -114,7 +114,7 @@ class SubmissionHandler(SimpleHTTPRequestHandler):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8765")))  # 미리보기 도구가 PORT 로 빈 포트를 준다
     parser.add_argument("--devkit", required=True, help="nova-devkit 폴더")
     parser.add_argument("--samples", default=str(Path(__file__).resolve().parents[1] / "fixtures" / "nova-samples-2026"))
     parser.add_argument("--runs", default=str(Path(__file__).resolve().parents[1] / "submission-runs"))
