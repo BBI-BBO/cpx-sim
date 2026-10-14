@@ -740,7 +740,7 @@ async function history() {
   return rows.map((r: any) => {
     const m = /^(\d{8})_(\d{6})_/.exec(r.name), meta = r.meta || {}, n = r.n_submits || 0;
     return {
-      name: r.name, title: meta.title || "", memo: meta.memo || "", label: meta.label || "",
+      name: r.name, title: meta.title || "", memo: meta.memo || "", label: meta.label || "", official: meta.official || null,
       when: m ? `${m[1].slice(4, 6)}/${m[1].slice(6)} ${m[2].slice(0, 2)}:${m[2].slice(2, 4)}` : r.name,
       case: r.cid, who: r.who || "", mode: r.mode, turns: r.turns || 0, status: n ? "제출" : "진행 중",
       total: n ? r.total : null, dx: n ? r.dx : null, truth: n ? r.truth : null, rescored: Math.max(0, n - 1),
@@ -957,6 +957,20 @@ async function handle(req: Request): Promise<Response> {
     R.meta = { ...(R.meta || {}), ...cleanMeta(b), updated: stamp() };
     await db.encPatch(R.name, { meta: R.meta });
     return reply({ ok: true, meta: R.meta });
+  }
+  // 대회 결과(샘플 검증·공식 평가)를 실험 라벨 단위로 기록: 같은 라벨의 모든 진료 meta.official 에 넣는다
+  if (path === "/api/label/official") {
+    const label = String(b.label || "").trim().slice(0, 60);
+    if (!label) throw bad("라벨이 없습니다");
+    const num = (v: any, mx: number) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= mx ? Math.round(n * 1000) / 1000 : null; };
+    const scores: Record<string, number | null> = {};
+    for (const [d, mx] of P.DOMAINS as [string, number][]) scores[d] = num(b.scores?.[d], mx);
+    const official = b.clear ? null : { total: num(b.total, 100), scores, kind: String(b.kind || "샘플 검증").slice(0, 20),
+                                        when: String(b.when || "").slice(0, 30), note: String(b.note || "").slice(0, 300), updated: stamp() };
+    const rows = (await db.encList()).filter((r: any) => (r.meta || {}).label === label);
+    if (!rows.length) throw bad("그 라벨의 진료가 없습니다", 404);
+    for (const r of rows) await db.encPatch(r.name, { meta: { ...(r.meta || {}), official } });
+    return reply({ ok: true, n: rows.length, official });
   }
   if (path === "/api/record/delete") {
     const R = await getEnc(safe(b.name));

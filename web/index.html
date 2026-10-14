@@ -204,6 +204,9 @@ body.drawer-hidden .main{margin-left:0}
 .soap-orig{display:grid;grid-template-columns:34px 1fr;gap:12px 10px;font-size:16px;line-height:1.8;align-items:baseline}
 .soap-orig .txt{white-space:pre-wrap;word-break:break-word;min-width:0}
 .soap-orig .soap-k{margin:0}
+.off-row{display:flex;gap:8px;align-items:flex-start;padding:8px 12px;margin:2px 4px 6px;border-radius:var(--r);background:color-mix(in srgb,var(--pri, #3b5bdb) 7%,transparent);font-size:13px}
+.off-main{flex:1;min-width:0}
+.off-row .meta{font-size:12px}
 mark.hl{color:inherit;background:transparent;border-radius:2px;padding:0;cursor:help;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.good{background:color-mix(in srgb,var(--ok) 15%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--ok) 75%,transparent)}
 mark.hl.warn{background:color-mix(in srgb,#d69a2d 20%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
@@ -724,13 +727,37 @@ function groupStats(rows){
     avg: done.length ? Math.round(done.reduce((a, r) => a + r.total, 0) / done.length) : null,
     acc: acc.length ? Math.round(acc.reduce((a, r) => a + r.accuracy, 0) / acc.length) : null};
 }
+/* 대회 결과(라벨 단위): 총점과 영역별 점수. 우리 채점기 평균과 나란히 본다 */
+const offOf = rows => (rows.find(r => r.official && r.official.total != null) || {}).official || null;
+function offHTML(key, rows){
+  const o = offOf(rows), st = groupStats(rows);
+  const doms = o ? DOMAINS.map(([d, mx]) => o.scores && o.scores[d] != null ? `${d} ${o.scores[d]}/${mx}` : "").filter(Boolean).join(" · ") : "";
+  return `<div class="off-row"><div class="off-main">${o ? `<b>대회 ${esc(o.kind || "")} ${o.total}점</b>${st.avg != null ? ` <span class="meta">(우리 채점기 평균 ${st.avg})</span>` : ""}<div class="meta">${esc(doms)}${o.when ? ` · ${esc(o.when)}` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>` : `<span class="meta">대회 결과 없음</span>`}</div>
+    <button class="btn text sm off-edit" data-off="${esc(key)}">${I("edit")}${o ? "수정" : "입력"}</button></div>`;
+}
+function editOfficial(label){
+  const o = offOf(HIST.filter(r => r.label === label)) || {}, sc = o.scores || {};
+  dialog({title:`대회 결과 · ${label}`, body:`<div class="fld"><label>구분</label><input class="inp" id="oK" value="${esc(o.kind || "샘플 검증")}" placeholder="샘플 검증 / 공식 평가"></div>
+    <div class="fld"><label>총점 <small>/ 100</small></label><input class="inp" id="oT" type="number" step="0.001" value="${o.total ?? ""}"></div>
+    ${DOMAINS.map(([d, mx], i) => `<div class="fld"><label>${d} <small>/ ${mx}</small></label><input class="inp" id="oD${i}" type="number" step="0.01" value="${sc[d] ?? ""}"></div>`).join("")}
+    <div class="fld"><label>평가 시각 <small>대회 화면의 요청 시각</small></label><input class="inp" id="oW" value="${esc(o.when || "")}" placeholder="10.14 08:17"></div>
+    <div class="fld"><label>메모</label><input class="inp" id="oN" value="${esc(o.note || "")}" placeholder="예: 기록 호출 TOKEN_LIMIT_EXCEEDED → 진단 미정"></div>`,
+    actions:[...(o.total != null ? [{label:"지우기", left:true, onClick: async close => { try { await api("/api/label/official", {label, clear:true}); close(null); toast("지웠습니다"); refreshSide(); } catch(e){ fail(e); } }}] : []),
+      {label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
+      try {
+        const scores = Object.fromEntries(DOMAINS.map(([d], i) => [d, $("#oD" + i, el).value]));
+        const r = await api("/api/label/official", {label, kind:$("#oK", el).value, total:$("#oT", el).value, scores, when:$("#oW", el).value, note:$("#oN", el).value});
+        close(null); toast(`${r.n}건에 기록했습니다`); refreshSide();
+      } catch(e){ fail(e); }
+    }}]});
+}
 function groupHTML(key, rows, open, cur){
-  const st = groupStats(rows), name = key || "라벨 없음";
-  const m = [`${st.n}회`, st.avg != null ? `평균 ${st.avg}점` : "", st.acc != null ? `정확도 ${st.acc}%` : "", st.pending ? `미채점 ${st.pending}` : ""].filter(Boolean).join(" · ");
+  const st = groupStats(rows), name = key || "라벨 없음", off = key ? offOf(rows) : null;
+  const m = [off ? `대회 ${off.total}` : "", `${st.n}회`, st.avg != null ? `평균 ${st.avg}점` : "", st.acc != null ? `정확도 ${st.acc}%` : "", st.pending ? `미채점 ${st.pending}` : ""].filter(Boolean).join(" · ");
   let body = "";
   if (open) {
     const live = rows.filter(r => r.live), rest = rows.filter(r => !r.live);
-    body = live.map(navItem).join("");
+    body = (key ? offHTML(key, rows) : "") + live.map(navItem).join("");
     if (key) body += rest.map(navItem).join("");
     else { let g = null; for (const r of rest) { const k = dayGroup(r.name); if (k !== g) { body += `<div class="grp sub">${k}</div>`; g = k; } body += navItem(r); } }
   }
@@ -754,6 +781,7 @@ function renderSide(){
   $("#adminLink").classList.toggle("on", /^#(admin|edit\/)/.test(prevHash || ""));
 }
 $("#sideHist").addEventListener("click", e => {
+  const ob = e.target.closest(".off-edit"); if (ob) { e.preventDefault(); editOfficial(ob.dataset.off); return; }
   const b = e.target.closest(".grp-h"); if (!b) return;
   GOPEN[b.dataset.g] = b.getAttribute("aria-expanded") !== "true"; saveGroups(); renderSide();
 });
@@ -1212,14 +1240,36 @@ function soapResultHTML(sub, judge){
     const x = items.slice().sort((a, b) => (verdictRank[vcls(a.verdict)] ?? 1) - (verdictRank[vcls(b.verdict)] ?? 1))[0];
     return `<span class="chip sm ${vcls(x.verdict) === "good" ? "g" : vcls(x.verdict) === "bad" ? "r" : "y"}">${esc((VERD[vcls(x.verdict)] || ["", "검토"])[1])}</span>`;
   };
+  // 문장 조각(S1, O2 …)은 절(S·O·A·P) 전체를 문장으로 나눈 번호다. 조각 글이 들어 있는 칸을 찾아 그 칸 원문 위에
+  // 초록·노랑·빨강으로 칠하고, 마우스를 올리면(휴대폰은 누르면) 왜 좋고 아쉬운지 보인다. 원문에서 못 찾은 조각만 아래에 글로 남긴다.
+  const norm = t => String(t || "").replace(/\s+/g, "");
+  const split = sub.soap_split || {};
+  const noteHTML = (notes) => notes.length ? `<div class="meta" style="margin-top:4px">${notes.map(x => `[${esc(x.id || "")}] ${esc(x.note || "")}`).join(" · ")}</div>` : "";
   let h = `<div class="soap-result">`;
   for (const [sec, cfg] of Object.entries(SOAP_UI)) {
+    const secNotes = sentences.filter(x => String(x.id || "").toUpperCase().startsWith(sec));
+    const byField = Object.fromEntries(cfg.fields.map(([key]) => [key, []])), rest = [];
+    for (const x of secNotes) {
+      const idx = parseInt(String(x.id || "").slice(1), 10) - 1;
+      let frag = String((split[sec] || [])[idx] || "").trim(), hit = null;
+      if (frag) {
+        for (const [key, label] of cfg.fields) {
+          const value = String(fields[sec]?.[key] || "");
+          if (!value) continue;
+          const f = frag.startsWith(label + ":") ? frag.slice(label.length + 1).trim() : frag;
+          if (f && (value.includes(f) || norm(value).includes(norm(f)))) { hit = key; frag = value.includes(f) ? f : ""; break; }
+        }
+      }
+      (hit ? byField[hit] : rest).push({ ...x, frag });
+    }
     h += `<div class="soap-section-label">${sec}</div><div>`;
     for (const [key, label] of cfg.fields) {
-      const value = fields[sec]?.[key] || "";
-      const notes = sentences.filter(x => String(x.id || "").toUpperCase().startsWith(sec));
-      h += `<div class="soap-field-row"><b><code>${key}</code> ${label}</b>${badge(notes)}<div>${value ? esc(value) : '<span class="meta">비어 있음</span>'}</div>${notes.length ? `<div class="meta" style="margin-top:4px">${notes.map(x => `[${esc(x.id || sec)}] ${esc(x.note || "")}`).join(" · ")}</div>` : ""}</div>`;
+      const value = fields[sec]?.[key] || "", notes = byField[key];
+      const painted = notes.filter(x => x.frag), unpainted = notes.filter(x => !x.frag);
+      const body = value ? (painted.length ? soapMarked(value, painted.map(x => x.frag), i => painted[i]) : esc(value)) : '<span class="meta">비어 있음</span>';
+      h += `<div class="soap-field-row"><b><code>${key}</code> ${label}</b>${badge(notes)}<div style="white-space:pre-wrap">${body}</div>${noteHTML(unpainted)}</div>`;
     }
+    if (rest.length) h += `<div class="soap-field-row"><b>${sec} 문장별 평가</b>${badge(rest)}${noteHTML(rest)}</div>`;
     h += `</div>`;
   }
   const ds = dxScore(judge), dxVerdict = !ds ? "warn" : ds >= 4 ? "good" : ds === 3 ? "warn" : "bad";
