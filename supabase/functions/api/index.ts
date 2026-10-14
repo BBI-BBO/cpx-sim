@@ -965,10 +965,19 @@ async function handle(req: Request): Promise<Response> {
     const num = (v: any, mx: number) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= mx ? Math.round(n * 1000) / 1000 : null; };
     const scores: Record<string, number | null> = {};
     for (const [d, mx] of P.DOMAINS as [string, number][]) scores[d] = num(b.scores?.[d], mx);
-    const official = b.clear ? null : { total: num(b.total, 100), scores, kind: String(b.kind || "샘플 검증").slice(0, 20),
-                                        when: String(b.when || "").slice(0, 30), note: String(b.note || "").slice(0, 300), updated: stamp() };
     const rows = (await db.encList()).filter((r: any) => (r.meta || {}).label === label);
     if (!rows.length) throw bad("그 라벨의 진료가 없습니다", 404);
+    // 보낸 칸만 바꾼다 (분석 글만 고칠 때 점수가 지워지지 않게)
+    const old = (rows.find((r: any) => (r.meta || {}).official) || {}).meta?.official || {};
+    const official = b.clear ? null : {
+      ...old,
+      ...("total" in b ? { total: num(b.total, 100) } : {}),
+      ...("scores" in b ? { scores } : {}),
+      ...("kind" in b ? { kind: String(b.kind || "샘플 검증").slice(0, 20) } : {}),
+      ...("when" in b ? { when: String(b.when || "").slice(0, 30) } : {}),
+      ...("note" in b ? { note: String(b.note || "").slice(0, 300) } : {}),
+      ...("analysis" in b ? { analysis: String(b.analysis || "").slice(0, 12000) } : {}),
+      updated: stamp() };
     for (const r of rows) await db.encPatch(r.name, { meta: { ...(r.meta || {}), official } });
     return reply({ ok: true, n: rows.length, official });
   }

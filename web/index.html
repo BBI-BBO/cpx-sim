@@ -204,9 +204,16 @@ body.drawer-hidden .main{margin-left:0}
 .soap-orig{display:grid;grid-template-columns:34px 1fr;gap:12px 10px;font-size:16px;line-height:1.8;align-items:baseline}
 .soap-orig .txt{white-space:pre-wrap;word-break:break-word;min-width:0}
 .soap-orig .soap-k{margin:0}
-.off-row{display:flex;gap:8px;align-items:flex-start;padding:8px 12px;margin:2px 4px 6px;border-radius:var(--r);background:color-mix(in srgb,var(--pri, #3b5bdb) 7%,transparent);font-size:13px}
-.off-main{flex:1;min-width:0}
-.off-row .meta{font-size:12px}
+.tbl-wrap{overflow-x:auto}
+.off-tbl{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+.off-tbl th,.off-tbl td{padding:7px 10px;border-bottom:1px solid var(--line, #e3e5ea);text-align:right;white-space:nowrap}
+.off-tbl th:first-child{text-align:left}
+.off-tbl thead th{font-weight:600}
+.off-tbl small{opacity:.6;font-weight:400}
+.off-tbl .g{color:var(--ok)}
+.off-tbl .r{color:var(--bad)}
+.off-tbl tr:last-child th,.off-tbl tr:last-child td{border-top:2px solid var(--line, #e3e5ea)}
+.an-body{white-space:pre-wrap;line-height:1.7;font-size:15px}
 mark.hl{color:inherit;background:transparent;border-radius:2px;padding:0;cursor:help;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.good{background:color-mix(in srgb,var(--ok) 15%,transparent);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--ok) 75%,transparent)}
 mark.hl.warn{background:color-mix(in srgb,#d69a2d 20%,transparent);box-shadow:inset 0 -2px 0 #d69a2d}
@@ -468,6 +475,7 @@ mark.hl.bad:hover,mark.hl.bad.hl-on{background:color-mix(in srgb,var(--bad) 30%,
           <button class="ctab" data-t="chat"><span class="ms">forum</span>대화</button>
           <button class="ctab" data-t="soap"><span class="ms">edit_note</span>SOAP 기록</button>
           <button class="ctab" data-t="result"><span class="ms">insights</span>결과</button>
+          <button class="ctab" data-t="official"><span class="ms">emoji_events</span>대회 결과</button>
         </div>
       </div></div>
       <div class="cbody" id="cvBody"></div>
@@ -729,12 +737,6 @@ function groupStats(rows){
 }
 /* 대회 결과(라벨 단위): 총점과 영역별 점수. 우리 채점기 평균과 나란히 본다 */
 const offOf = rows => (rows.find(r => r.official && r.official.total != null) || {}).official || null;
-function offHTML(key, rows){
-  const o = offOf(rows), st = groupStats(rows);
-  const doms = o ? DOMAINS.map(([d, mx]) => o.scores && o.scores[d] != null ? `${d} ${o.scores[d]}/${mx}` : "").filter(Boolean).join(" · ") : "";
-  return `<div class="off-row"><div class="off-main">${o ? `<b>대회 ${esc(o.kind || "")} ${o.total}점</b>${st.avg != null ? ` <span class="meta">(우리 채점기 평균 ${st.avg})</span>` : ""}<div class="meta">${esc(doms)}${o.when ? ` · ${esc(o.when)}` : ""}${o.note ? ` · ${esc(o.note)}` : ""}</div>` : `<span class="meta">대회 결과 없음</span>`}</div>
-    <button class="btn text sm off-edit" data-off="${esc(key)}">${I("edit")}${o ? "수정" : "입력"}</button></div>`;
-}
 function editOfficial(label){
   const o = offOf(HIST.filter(r => r.label === label)) || {}, sc = o.scores || {};
   dialog({title:`대회 결과 · ${label}`, body:`<div class="fld"><label>구분</label><input class="inp" id="oK" value="${esc(o.kind || "샘플 검증")}" placeholder="샘플 검증 / 공식 평가"></div>
@@ -742,22 +744,52 @@ function editOfficial(label){
     ${DOMAINS.map(([d, mx], i) => `<div class="fld"><label>${d} <small>/ ${mx}</small></label><input class="inp" id="oD${i}" type="number" step="0.01" value="${sc[d] ?? ""}"></div>`).join("")}
     <div class="fld"><label>평가 시각 <small>대회 화면의 요청 시각</small></label><input class="inp" id="oW" value="${esc(o.when || "")}" placeholder="10.14 08:17"></div>
     <div class="fld"><label>메모</label><input class="inp" id="oN" value="${esc(o.note || "")}" placeholder="예: 기록 호출 TOKEN_LIMIT_EXCEEDED → 진단 미정"></div>`,
-    actions:[...(o.total != null ? [{label:"지우기", left:true, onClick: async close => { try { await api("/api/label/official", {label, clear:true}); close(null); toast("지웠습니다"); refreshSide(); } catch(e){ fail(e); } }}] : []),
+    actions:[...(o.total != null ? [{label:"지우기", left:true, onClick: async close => { try { await api("/api/label/official", {label, clear:true}); close(null); toast("지웠습니다"); await refreshSide(); if (CV && cvTab === "official") renderOfficial(); } catch(e){ fail(e); } }}] : []),
       {label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
       try {
         const scores = Object.fromEntries(DOMAINS.map(([d], i) => [d, $("#oD" + i, el).value]));
         const r = await api("/api/label/official", {label, kind:$("#oK", el).value, total:$("#oT", el).value, scores, when:$("#oW", el).value, note:$("#oN", el).value});
-        close(null); toast(`${r.n}건에 기록했습니다`); refreshSide();
+        close(null); toast(`${r.n}건에 기록했습니다`); await refreshSide(); if (CV && cvTab === "official") renderOfficial();
       } catch(e){ fail(e); }
     }}]});
 }
+/* 대회 결과 탭: 이 진료의 실험 라벨(= 제출 ZIP)로 묶인 서버 진료들을 우리 채점기로 낸 점수의 평균과, 대회가 준 점수를 영역별로 나란히.
+   아래에 차이의 원인 분석 글(라벨 단위로 저장)을 쓴다 */
+function renderOfficial(){
+  const v = CV, label = (v.meta || {}).label || HIST.find(r => r.name === v.name)?.label || "";
+  if (!label) { body().innerHTML = `<div class="empty-pane">${I("emoji_events")}<p>이 진료에 실험 라벨이 없습니다. 대회 결과는 제출 ZIP 이름 라벨 단위로 기록합니다.</p></div>`; return; }
+  const rows = HIST.filter(r => r.label === label), done = rows.filter(r => !r.live && r.scores);
+  const o = offOf(rows) || {}, sc = o.scores || {};
+  const byCase = [...done].sort((a, b) => String(a.case).localeCompare(String(b.case)));
+  const avg = d => done.length ? done.reduce((a, r) => a + (Number(r.scores[d]) || 0), 0) / done.length : null;
+  const tot = done.length ? done.reduce((a, r) => a + (Number(r.total) || 0), 0) / done.length : null;
+  const f1 = x => x == null || x === "" ? "–" : (Math.round(Number(x) * 10) / 10).toString();
+  const diff = (off, ours) => off == null || ours == null ? "–" : `<span class="${off - ours >= 0 ? "g" : "r"}">${off - ours >= 0 ? "+" : ""}${f1(off - ours)}</span>`;
+  const caseH = byCase.map(r => `<th><a href="#c/${esc(r.name)}/result">${esc(caseLabel(r.case))}</a></th>`).join("");
+  const line = (name, mx, cells, ours, off) => `<tr><th>${name}<small> / ${mx}</small></th>${cells}<td><b>${f1(ours)}</b></td><td><b>${f1(off)}</b></td><td>${diff(off == null || off === "" ? null : Number(off), ours)}</td></tr>`;
+  const trs = DOMAINS.map(([d, mx]) => line(d, mx, byCase.map(r => `<td>${f1(r.scores[d])}</td>`).join(""), avg(d), sc[d])).join("")
+    + line("총점", 100, byCase.map(r => `<td>${f1(r.total)}</td>`).join(""), tot, o.total);
+  const an = String(o.analysis || "").trim();
+  body().innerHTML = `<div class="pane">
+    <div class="sec-h"><h3>대회 결과 · ${esc(label)}</h3><button class="btn text sm" id="offEdit">${I("edit")}${o.total != null ? "점수 수정" : "점수 입력"}</button></div>
+    <p class="meta">${o.total != null ? `${esc(o.kind || "샘플 검증")}${o.when ? " · " + esc(o.when) : ""}${o.note ? " · " + esc(o.note) : ""}` : "아직 대회 점수를 넣지 않았습니다."} 우리 점수는 이 라벨의 서버 진료 ${done.length}건을 우리 채점기로 채점한 값입니다.</p>
+    <div class="tbl-wrap"><table class="off-tbl"><thead><tr><th>영역</th>${caseH}<th>우리 평균</th><th>대회</th><th>차이<small> 대회−우리</small></th></tr></thead><tbody>${trs}</tbody></table></div>
+    <div class="sec-h"><h3>분석</h3><button class="btn text sm" id="anEdit">${I("edit_note")}${an ? "분석 수정" : "분석 쓰기"}</button></div>
+    ${an ? `<div class="an-body">${esc(an)}</div>` : `<p class="meta">대회 점수와 우리 채점기의 차이, 그 원인과 고칠 점을 여기에 씁니다.</p>`}
+  </div>`;
+  $("#offEdit").onclick = () => editOfficial(label);
+  $("#anEdit").onclick = () => dialog({title:`분석 · ${label}`, cls:"wide", body:`<textarea class="inp" id="anT" rows="16" placeholder="영역별 차이 → 서버 대화에서 확인한 원인 → 고칠 점">${esc(an)}</textarea>`,
+    actions:[{label:"취소", value:null}, {label:"저장", kind:"filled", onClick: async (close, el) => {
+      try { await api("/api/label/official", {label, analysis:$("#anT", el).value}); close(null); toast("저장했습니다"); await refreshSide(); if (CV === v) renderOfficial(); } catch(e){ fail(e); }
+    }}]});
+}
 function groupHTML(key, rows, open, cur){
-  const st = groupStats(rows), name = key || "라벨 없음", off = key ? offOf(rows) : null;
-  const m = [off ? `대회 ${off.total}` : "", `${st.n}회`, st.avg != null ? `평균 ${st.avg}점` : "", st.acc != null ? `정확도 ${st.acc}%` : "", st.pending ? `미채점 ${st.pending}` : ""].filter(Boolean).join(" · ");
+  const st = groupStats(rows), name = key || "라벨 없음";
+  const m = [`${st.n}회`, st.avg != null ? `평균 ${st.avg}점` : "", st.acc != null ? `정확도 ${st.acc}%` : "", st.pending ? `미채점 ${st.pending}` : ""].filter(Boolean).join(" · ");
   let body = "";
   if (open) {
     const live = rows.filter(r => r.live), rest = rows.filter(r => !r.live);
-    body = (key ? offHTML(key, rows) : "") + live.map(navItem).join("");
+    body = live.map(navItem).join("");
     if (key) body += rest.map(navItem).join("");
     else { let g = null; for (const r of rest) { const k = dayGroup(r.name); if (k !== g) { body += `<div class="grp sub">${k}</div>`; g = k; } body += navItem(r); } }
   }
@@ -781,7 +813,6 @@ function renderSide(){
   $("#adminLink").classList.toggle("on", /^#(admin|edit\/)/.test(prevHash || ""));
 }
 $("#sideHist").addEventListener("click", e => {
-  const ob = e.target.closest(".off-edit"); if (ob) { e.preventDefault(); editOfficial(ob.dataset.off); return; }
   const b = e.target.closest(".grp-h"); if (!b) return;
   GOPEN[b.dataset.g] = b.getAttribute("aria-expanded") !== "true"; saveGroups(); renderSide();
 });
@@ -795,7 +826,7 @@ async function route(){
     if ((ED._unsaved || edDirty) && !await ask("저장하지 않은 변경", "이 증례에 저장하지 않은 변경이 있습니다. 나갈까요?", "나가기", true)) { history.replaceState(null, "", prevHash); return; }
     ED = null; edDirty = false;
   }
-  const m = /^#c\/([^/]+)(?:\/(chat|soap|result))?$/.exec(h) || /^#r\/([^/]+)$/.exec(h);
+  const m = /^#c\/([^/]+)(?:\/(chat|soap|result|official))?$/.exec(h) || /^#r\/([^/]+)$/.exec(h);
   if (m && CV && CV.name === m[1]) { prevHash = h; setTab(m[2] || "chat", true); renderSide(); return; }  // 같은 진료 안에서 탭만 바꿈
   navSeq++; leaveConv();
   prevHash = h; closeDrawer(); closeMenu(); renderSide(); setCtx("");
@@ -975,7 +1006,7 @@ function setTab(t, fromRoute){
   const want = "#c/" + CV.name + (t === "chat" ? "" : "/" + t);
   if (!fromRoute && decodeURIComponent(location.hash) !== want) { history.replaceState(null, "", want); prevHash = want; }
   $("#composer").hidden = !(t === "chat" && !CV.done);
-  if (t === "chat") renderChat(); else { if (t === "soap") renderSoap(); else renderResult(); body().scrollTop = 0; }
+  if (t === "chat") renderChat(); else { if (t === "soap") renderSoap(); else if (t === "official") renderOfficial(); else renderResult(); body().scrollTop = 0; }
 }
 $$("#cvTabs .ctab").forEach(b => b.onclick = () => setTab(b.dataset.t));
 $("#cvVit").onclick = e => { if (CV) popup(e.currentTarget, `<div class="pop"><b>활력징후</b>${vitHTML(CV.patient?.vitals)}</div>`); };
