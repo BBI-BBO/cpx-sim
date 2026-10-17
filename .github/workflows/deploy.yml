@@ -56,7 +56,14 @@ jobs:
         env:
           OPENAI: ${{ secrets.SP_OPENAI_API_KEY }}
           PW: ${{ secrets.SP_WEB_PASSWORD }}
-        run: supabase secrets set --project-ref "$REF" "SP_OPENAI_API_KEY=$OPENAI" "SP_WEB_PASSWORD=$PW"
+          NOVA_KEY: ${{ secrets.SP_NOVA_DEV_KEY }}
+          NOVA_BASE: ${{ secrets.SP_NOVA_API_BASE }}
+        run: |
+          supabase secrets set --project-ref "$REF" "SP_OPENAI_API_KEY=$OPENAI" "SP_WEB_PASSWORD=$PW"
+          # 대회 공개 샘플(웹 8·9·10번)은 대회 API 샘플 세션으로 진료한다 (없으면 그 환자는 진료를 시작하지 않음)
+          if [ -n "$NOVA_KEY" ] && [ -n "$NOVA_BASE" ]; then
+            supabase secrets set --project-ref "$REF" "NOVA_DEV_KEY=$NOVA_KEY" "NOVA_API_BASE=$NOVA_BASE"
+          fi
       - name: 함수 배포
         if: steps.check.outputs.ready == 'true'
         run: supabase functions deploy api --project-ref "$REF" --no-verify-jwt

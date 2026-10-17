@@ -863,27 +863,22 @@ function showRules(){
     <li>${I("timer")}<div><b>${CFG.max_turns}턴까지</b><p>${lim}.</p></div></li>
   </ul>`, actions:[{label:"확인", value:null, kind:"filled"}]});
 }
+// 새 진료는 대회 공개 샘플 3명(8·9·10번 = C01·C03·C10)만. 이 환자들은 서버가 대회 API 샘플 세션으로 진료한다 (예선 규칙)
+const NOVA_SAMPLES = ["C01", "C03", "C10"];
 function openPicker(){
   let sel = null, m = "예선";
+  const PICK = CASES.filter(c => NOVA_SAMPLES.includes(c.cid));
   const d = dialog({title:"새 진료", body:`
-    ${CASES.length > 6 ? `<div class="search">${I("search")}<input id="pkQ" placeholder="번호·나이·주호소로 찾기" autocomplete="off"></div>` : ""}
     <div class="pk-list" id="pkList"></div>
-    <div class="pk-mode"><div class="seg" id="pkMode"><button data-m="예선">예선</button><button data-m="본선">본선</button></div><span class="meta" id="pkHelp"></span></div>`,
+    <div class="pk-mode"><span class="meta" id="pkHelp">대회 서버의 공개 샘플 환자와 진료합니다 (예선: 대화와 진찰)</span></div>`,
     actions:[{label:"취소", value:null}, {label:"진료 시작", value:"go", kind:"filled", id:"pkGo"}]});
   const list = () => {
-    const q = ($("#pkQ", d.el)?.value || "").trim().toLowerCase();
-    $("#pkList", d.el).innerHTML = CASES.filter(c => !q || `${c.no} ${c.age}세 ${sexW(c.sex)} ${c.cc}`.toLowerCase().includes(q)).map(c =>
+    $("#pkList", d.el).innerHTML = PICK.map(c =>
       `<button class="pk${sel === c.cid ? " on" : ""}" data-c="${esc(c.cid)}"><span class="num">${c.no}</span><span class="pk-main"><span class="cc">${esc(c.cc)}${lvChip(c.level)}</span><span class="who">${esc(c.age)}세 ${esc(sexW(c.sex))}</span></span></button>`
     ).join("") || `<div class="side-empty">찾는 환자가 없습니다</div>`;
     $$(".pk", d.el).forEach(b => { b.onclick = () => { sel = b.dataset.c; list(); upd(); }; b.ondblclick = () => { sel = b.dataset.c; d.close("go"); }; });
   };
-  const upd = () => {
-    $("#pkGo", d.el).disabled = !sel;
-    $$("#pkMode button", d.el).forEach(b => b.classList.toggle("on", b.dataset.m === m));
-    $("#pkHelp", d.el).textContent = m === "본선" ? "대화·진찰에 검사까지 합니다" : "대화와 진찰만 합니다";
-  };
-  $$("#pkMode button", d.el).forEach(b => b.onclick = () => { m = b.dataset.m; upd(); });
-  $("#pkQ", d.el)?.addEventListener("input", list);
+  const upd = () => { $("#pkGo", d.el).disabled = !sel; };
   list(); upd();
   d.done.then(v => { if (v === "go" && sel) { setPatient(sel); startConv(sel, m); } });
 }

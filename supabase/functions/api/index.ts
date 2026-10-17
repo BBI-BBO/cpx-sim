@@ -580,6 +580,89 @@ async function writeFinding(R: any, F: CaseFacts, request: string, maneuver: str
   }
   throw bad("진찰 판정 응답이 올바르지 않습니다 (EXAMINER_RESPONSE_INVALID). 턴은 쓰지 않았으니 다시 보내 주세요.", 503);
 }
+// 대회 공개 샘플(C01·C03·C10 = 웹 8·9·10번)은 무조건 대회 서버 샘플 세션의 실제 환자·진찰 판정으로 진료한다 (2026-10-18).
+// 팀 키 luna 로 흉내 내지 않는다. 개발 키·주소는 함수 비밀값 NOVA_DEV_KEY·NOVA_API_BASE 로만 받고, 없으면 진료를 시작하지 않는다.
+const NOVA_BASE = env("NOVA_API_BASE").replace(/\/+$/, ""), NOVA_KEY = env("NOVA_DEV_KEY");
+const NOVA_SAMPLES = ["C01", "C03", "C10"];
+async function nova(method: string, path: string, body?: unknown): Promise<{ status: number; json: any }> {
+  try {
+    const res = await fetch(NOVA_BASE + path, {
+      method, headers: { Authorization: `Bearer ${NOVA_KEY}`, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    let json: any = null;
+    try { json = await res.json(); } catch { json = null; }
+    return { status: res.status, json };
+  } catch { return { status: 0, json: { error: { code: "API_UNAVAILABLE" } } }; }
+}
+const novaCode = (r: { status: number; json: any }) =>
+  r.status >= 200 && r.status < 300 ? "" : String(r.json?.error?.code || (r.json ? "API_ERROR" : "INVALID_API_RESPONSE"));
+let novaIds: Record<string, string> | null = null;
+async function novaSampleId(cid: string): Promise<string> {
+  if (!novaIds) {
+    const r = await nova("GET", "/v1/sample/cases");
+    if (novaCode(r)) throw bad(`대회 서버 샘플 목록을 받지 못했습니다 (${novaCode(r)})`, 502);
+    const ids: Record<string, string> = {};
+    for (const it of r.json?.cases || []) {
+      const m = String(it.explanation || "").match(/\b(C01|C03|C10)\b/);
+      if (m) ids[m[1]] = String(it.case_id);
+    }
+    novaIds = ids;
+  }
+  if (!novaIds[cid]) throw bad(`대회 서버에 ${cid} 샘플이 없습니다`, 502);
+  return novaIds[cid];
+}
+async function novaStart(cid: string): Promise<any> {
+  if (!NOVA_BASE || !NOVA_KEY) throw bad("대회 API 키가 서버에 설정되지 않아 이 환자는 진료할 수 없습니다", 503);
+  const r = await nova("POST", "/v1/sample/sessions", { case_id: await novaSampleId(cid), request_id: crypto.randomUUID() });
+  if (novaCode(r)) throw bad(`대회 서버 샘플 세션을 열지 못했습니다 (${novaCode(r)})`, 502);
+  return r.json;
+}
+// 오류 처리는 대회 개발 가이드대로: *_RESPONSE_INVALID 는 새 request_id 로, 서버가 처리 중이거나 응답이 깨졌으면 같은 request_id 로 기다렸다가
+const NOVA_WAIT = new Set(["API_UNAVAILABLE", "REQUEST_PENDING", "PROVIDER_UNAVAILABLE", "INVALID_API_RESPONSE", "ACTION_IN_PROGRESS"]);
+async function novaAction(R: any, body: Record<string, unknown>): Promise<{ ok: boolean; json?: any; code?: string }> {
+  const sid = encodeURIComponent(String(R.start.nova.session_id));
+  let rid = crypto.randomUUID(), waited = 0;
+  for (let a = 0; a < 10; a++) {
+    const r = await nova("POST", `/v1/sample/sessions/${sid}/actions`, { ...body, request_id: rid });
+    const code = novaCode(r);
+    if (!code) return { ok: true, json: r.json };
+    if ((code === "PATIENT_RESPONSE_INVALID" || code === "EXAMINER_RESPONSE_INVALID") && a < 4) { rid = crypto.randomUUID(); await sleep(1000); continue; }
+    if ((NOVA_WAIT.has(code) || r.status >= 500) && waited < 90e3) { const pause = Math.min(5000 * (a + 1), 20000); await sleep(pause); waited += pause; continue; }
+    return { ok: false, code };
+  }
+  return { ok: false, code: "API_UNAVAILABLE" };
+}
+const NOVA_WHY: Record<string, string> = {
+  EMPTY_CONTENT: "내용이 비어 있습니다", CONTENT_TOO_LONG: `${P.MAXLEN}자를 넘었습니다`,
+  EXAM_NOT_SPECIFIC: "진찰 동작 하나를 구체적으로 요청해 주세요 (전신·부위 전체·여러 동작 묶음은 안 됨)",
+  EXAM_NOT_RECOGNIZED: "신체진찰 동작으로 인식하지 못했습니다",
+};
+async function novaTurn(R: any, kind: "SAY" | "EXAM", u: string) {
+  const r = await novaAction(R, { action: kind, content: u });
+  if (!r.ok) {
+    const code = r.code || "API_ERROR";
+    if (NOVA_WHY[code]) return reject(R, kind, u, NOVA_WHY[code], code);
+    if (["TURN_LIMIT_REACHED", "SESSION_EXPIRED", "SESSION_CLOSED"].includes(code)) {
+      return { ok: false, code, out: `대회 서버 세션이 끝났습니다 (${code}). /제출 로 마무리하세요.` };
+    }
+    return { ok: false, code, out: `대회 서버 오류 (${code}). 잠시 뒤 다시 보내 주세요.` };
+  }
+  const j = r.json || {};
+  const out = nfc(kind === "SAY" ? j.content : j.result).trim();
+  R.events.push({ type: "turn", turn: turnsOf(R).length + 1, act: kind, text: u, out, server_turn: j.turn ?? null, time: kst() });
+  return { ok: true, out };
+}
+// 제출: 대회 서버 세션을 이 SOAP·주진단으로 닫는다 (빈 기록은 FINAL_RECORD_REQUIRED). 칸이 다 비었으면 S·O·A·P 글을 대표 칸에 넣는다.
+async function novaClose(R: any, soap: Record<string, string>, soapFields: Record<string, Record<string, string>>, dx: string) {
+  if (!R.start?.nova || R.start.nova.closed) return;
+  const note: Record<string, Record<string, string>> = JSON.parse(JSON.stringify(soapFields));
+  const blank = Object.values(note).every((sec) => Object.values(sec).every((v) => !String(v).trim()));
+  if (blank) { note.S.hpi = soap.S || ""; note.O.exam = soap.O || ""; note.A.evidence = soap.A || ""; note.P.treatment = soap.P || ""; }
+  const r = await novaAction(R, { action: "DIAGNOSE", note, diagnosis: dx });
+  R.start.nova = { ...R.start.nova, closed: r.ok, close_result: r.ok ? String(r.json?.status ?? "ok") : r.code };
+  await db.encPatch(R.name, { start: R.start });
+}
 // 공통 입력 검사: 빈 내용·30자(NFC) 초과는 1턴 사용
 function inputError(R: any, kind: string, text: string) {
   if (!text.trim()) return reject(R, kind, text, "내용이 비어 있습니다", "EMPTY_CONTENT");
@@ -591,6 +674,7 @@ async function say(R: any, C: any, text: string, U: Usage) {
   const m = checkMsg(R);
   if (m) return { ok: false, out: m, code: "TURN_LIMIT_REACHED" };
   const u = nfc(text);
+  if (R.start?.nova) return await novaTurn(R, "SAY", u);  // 대회 공개 샘플: 길이 판정까지 대회 서버가 한다
   const err = inputError(R, "SAY", u);
   if (err) return err;
   const { out, effective } = await patientReply(R, caseFacts(C), u, U);
@@ -601,7 +685,8 @@ async function act(R: any, C: any, kind: string, text: string, U: Usage) {
   const m = checkMsg(R);
   if (m) return { ok: false, out: m, code: "TURN_LIMIT_REACHED" };
   const u = nfc(text);
-  if (kind === "TEST" && R.mode !== "본선") return { ok: false, code: "ACTION_NOT_AVAILABLE", out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
+  if (kind === "TEST" && (R.mode !== "본선" || R.start?.nova)) return { ok: false, code: "ACTION_NOT_AVAILABLE", out: "예선에서는 검사(TEST)를 할 수 없습니다. 필요한 검사는 SOAP의 P에 계획으로 쓰세요. (턴 차감 없음)" };
+  if (kind === "EXAM" && R.start?.nova) return await novaTurn(R, "EXAM", u);  // 대회 공개 샘플: 진찰 판정도 대회 서버
   const err = inputError(R, kind, u);
   if (err) return err;
   if (kind === "EXAM") {
@@ -906,9 +991,15 @@ async function handle(req: Request): Promise<Response> {
     const ids = (await liveCases()).map((r: any) => r.cid);
     const cid = ids.includes(b.cid) ? b.cid : ids[(parseInt(b.no) || 1) - 1];
     if (!cid) throw bad("증례가 없습니다", 404);
-    const C = await getCase(cid), F = caseFacts(C), mode = b.mode === "본선" ? "본선" : "예선";
-    const p = { ...(C.patient || {}), opening: F.start_information.opening };  // 의사가 처음 받는 것: 시작 정보(첫마디·활력징후)뿐
-    const start = { type: "start", case: cid, pmcid: C.pmcid, mode, models: MODELS, patient: p, vitals: F.start_information.vital_signs, max_turns: P.MAX_TURNS, max_min: MAX_MIN, time: kst() };
+    const C = await getCase(cid), F = caseFacts(C);
+    // 대회 공개 샘플이면 대회 서버 샘플 세션을 열고(예선 규칙), 시작 정보도 서버가 준 것을 쓴다
+    const ns = NOVA_SAMPLES.includes(cid) ? await novaStart(cid) : null;
+    const mode = !ns && b.mode === "본선" ? "본선" : "예선";
+    const si = ns?.initial || {};
+    const p = { ...(C.patient || {}), opening: si.opening || F.start_information.opening };  // 의사가 처음 받는 것: 시작 정보(첫마디·활력징후)뿐
+    const start = { type: "start", case: cid, pmcid: C.pmcid, mode, models: ns ? { patient: "대회 서버", examiner: "대회 서버", judge: MODELS.judge } : MODELS,
+      patient: p, vitals: si.vital_signs || F.start_information.vital_signs, max_turns: P.MAX_TURNS, max_min: MAX_MIN, time: kst(),
+      ...(ns ? { nova: { session_id: String(ns.session_id), sample: cid, deadline: ns.deadline ?? null } } : {}) };
     let name = `${stamp()}_${cid}`;
     for (let i = 2; ; i++) {
       try {
@@ -947,6 +1038,7 @@ async function handle(req: Request): Promise<Response> {
     R.usage = R.usage || { calls: 0, in: 0, out: 0 };
     if (re && b.usage && typeof b.usage === "object") R.usage = { calls: num(b.usage.calls), in: num(b.usage.in), out: num(b.usage.out) };  // 개발 키트 실행의 사용량
     const { soap, soapFields } = soapInput(b);
+    if (!re) await novaClose(R, soap, soapFields, dx);  // 대회 공개 샘플이면 대회 서버 세션을 이 기록으로 닫는다
     await submit(R, C, soap, soapFields, dx, R.usage, re);
     await saveEnc(R);
     return reply(await convView(R));
